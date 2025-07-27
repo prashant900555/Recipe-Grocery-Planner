@@ -6,5 +6,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface RecipeIngredientRepository extends JpaRepository<RecipeIngredient, Long> {
+    int countByIngredientId(Long ingredientId);
+
     // Additional query methods can be implemented as needed
 }

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequestMapping("/ingredients")
@@ -57,8 +58,12 @@ public class IngredientController {
     }
 
     @PostMapping("/{id}/delete")
-    public String deleteIngredient(@PathVariable("id") Long id) {
-        ingredientService.deleteById(id);
+    public String deleteIngredient(@PathVariable("id") Long id, RedirectAttributes redirectAttributes) {
+        try {
+            ingredientService.deleteById(id);
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
         return "redirect:/ingredients";
     }
 }
