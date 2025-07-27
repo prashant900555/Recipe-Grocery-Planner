@@ -55,7 +55,7 @@ public class RecipeController {
     }
 
     @GetMapping("/{id}/edit")
-    public String editRecipeForm(@PathVariable Long id, Model model) {
+    public String editRecipeForm(@PathVariable("id") Long id, Model model) {
         Recipe recipe = recipeService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid recipe Id:" + id));
         model.addAttribute("recipe", recipe);
@@ -64,7 +64,7 @@ public class RecipeController {
     }
 
     @PostMapping("/{id}")
-    public String updateRecipe(@PathVariable Long id, @Valid @ModelAttribute("recipe") Recipe recipe, BindingResult result, Model model) {
+    public String updateRecipe(@PathVariable("id") Long id, @Valid @ModelAttribute("recipe") Recipe recipe, BindingResult result, Model model) {
         cleanEmptyRecipeIngredients(recipe);
         if (result.hasErrors()) {
             model.addAttribute("allIngredients", ingredientService.findAll());
@@ -77,7 +77,7 @@ public class RecipeController {
     }
 
     @PostMapping("/{id}/delete")
-    public String deleteRecipe(@PathVariable Long id) {
+    public String deleteRecipe(@PathVariable("id") Long id) {
         recipeService.deleteById(id);
         return "redirect:/recipes";
     }

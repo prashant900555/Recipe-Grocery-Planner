@@ -40,14 +40,14 @@ public class IngredientController {
     }
 
     @GetMapping("/{id}/edit")
-    public String editIngredientForm(@PathVariable Long id, Model model) {
+    public String editIngredientForm(@PathVariable("id") Long id, Model model) {
         Ingredient ingredient = ingredientService.findById(id).orElseThrow(() -> new IllegalArgumentException("Invalid ingredient Id:" + id));
         model.addAttribute("ingredient", ingredient);
         return "ingredients/form";
     }
 
     @PostMapping("/{id}")
-    public String updateIngredient(@PathVariable Long id, @Valid @ModelAttribute("ingredient") Ingredient ingredient, BindingResult result) {
+    public String updateIngredient(@PathVariable("id") Long id, @Valid @ModelAttribute("ingredient") Ingredient ingredient, BindingResult result) {
         if (result.hasErrors()) {
             return "ingredients/form";
         }
@@ -57,7 +57,7 @@ public class IngredientController {
     }
 
     @PostMapping("/{id}/delete")
-    public String deleteIngredient(@PathVariable Long id) {
+    public String deleteIngredient(@PathVariable("id") Long id) {
         ingredientService.deleteById(id);
         return "redirect:/ingredients";
     }

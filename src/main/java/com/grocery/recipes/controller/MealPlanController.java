@@ -81,7 +81,7 @@ public class MealPlanController {
     }
 
     @GetMapping("/{id}/edit")
-    public String editMealPlanForm(@PathVariable Long id, Model model) {
+    public String editMealPlanForm(@PathVariable("id") Long id, Model model) {
         MealPlan mealPlan = mealPlanService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid meal plan Id:" + id));
 
@@ -117,7 +117,7 @@ public class MealPlanController {
         return "mealplans/form";
     }
     @PostMapping("/{id}")
-    public String updateMealPlan(@PathVariable Long id,
+    public String updateMealPlan(@PathVariable("id") Long id,
                                  @Valid @ModelAttribute("mealPlan") MealPlan mealPlan,
                                  BindingResult result,
                                  Model model,
@@ -153,13 +153,13 @@ public class MealPlanController {
     }
 
     @PostMapping("/{id}/delete")
-    public String deleteMealPlan(@PathVariable Long id) {
+    public String deleteMealPlan(@PathVariable("id") Long id) {
         mealPlanService.deleteById(id);
         return "redirect:/mealplans";
     }
 
     @GetMapping("/{id}")
-    public String viewMealPlan(@PathVariable Long id, Model model) {
+    public String viewMealPlan(@PathVariable("id") Long id, Model model) {
         MealPlan mealPlan = mealPlanService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid meal plan Id:" + id));
 
