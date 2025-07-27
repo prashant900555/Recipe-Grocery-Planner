@@ -28,7 +28,7 @@ public class GroceryListController {
      * Display page to select a Meal Plan for grocery list generation.
      */
     @GetMapping
-    public String selectMealPlan(Model model, @RequestParam(required = false) Long mealPlanId) {
+    public String selectMealPlan(Model model, @RequestParam(name = "mealPlanId", required = false) Long mealPlanId) {
         List<MealPlan> mealPlans = mealPlanService.findAll();
         model.addAttribute("mealPlans", mealPlans);
 
@@ -47,7 +47,7 @@ public class GroceryListController {
      */
     @PostMapping
     public String saveGroceryList(
-            @RequestParam Long mealPlanId,
+            @RequestParam(name = "mealPlanId") Long mealPlanId,
             @RequestParam(value = "ingredientIds") List<Long> ingredientIds,
             @RequestParam(value = "quantities") List<Double> quantities,
             Model model) {

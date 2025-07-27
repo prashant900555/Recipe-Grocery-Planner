@@ -3,7 +3,6 @@ package com.grocery.recipes.service;
 import com.grocery.recipes.model.Ingredient;
 import com.grocery.recipes.repository.IngredientRepository;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.Optional;
 
