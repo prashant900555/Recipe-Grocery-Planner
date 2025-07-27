@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title th:text="${mealPlan.id} == null ? 'New Meal Plan' : 'Edit Meal Plan'">Meal Plan Form</title>
+    <meta charset="UTF-8"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/css/styles.css}"/>
+</head>
+<body>
+
+<h1 th:text="${mealPlan.id} == null ? 'Add New Meal Plan' : 'Edit Meal Plan'"></h1>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+        window.allRecipes = /*[[${allRecipes}]]*/ [];
+        window.initialItems = /*[[${mealPlan.items}]]*/ [];
+        window.mealPlanDates = /*[[${mealPlanDates}]]*/ [];
+        window.numDays = /*[[${numDays}]]*/ 3;
+        window.recipesPerDay = /*[[${recipesPerDay}]]*/ 3;
+    /*]]>*/
+</script>
+
+<form th:action="${mealPlan.id} == null ? @{/mealplans} : @{/mealplans/{id}(id=${mealPlan.id})}" th:object="${mealPlan}"
+      method="post">
+
+    <div class="form-group">
+        <label for="name">Meal Plan Name:</label>
+        <input type="text" th:field="*{name}" id="name" placeholder="Enter a name for the meal plan" required/>
+        <div class="error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></div>
+    </div>
+
+    <div class="form-group">
+        <label for="numDays">Number of Days:</label>
+        <input type="number" id="numDays" name="numDays" min="1" max="14" th:value="${numDays}" required/>
+    </div>
+
+    <div class="form-group">
+        <label for="recipesPerDay">Recipes Per Day:</label>
+        <input type="number" id="recipesPerDay" name="recipesPerDay" min="1" max="10" th:value="${recipesPerDay}"
+               required/>
+    </div>
+
+    <button type="button" onclick="generateDayBlocks(false)" class="button">Generate Day Forms</button>
+
+    <div id="mealplan-entries" style="margin-top:20px;"></div>
+
+    <button type="submit" class="button" style="margin-top:20px;">Save</button>
+
+</form>
+
+<a th:href="@{/mealplans}" class="button secondary" style="margin-top:20px;">Cancel</a>
+
+<script src="/js/scripts.js"></script>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    window.onload = function () {
+        generateDayBlocks(true);
+    };
+    /*]]>*/
+</script>
+
+</body>
+</html>
