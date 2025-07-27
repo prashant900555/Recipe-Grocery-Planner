@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title th:text="${mealPlan.name} + ' - Details'">Meal Plan Details</title>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" type="text/css" th:href="@{/css/styles.css}" />
+</head>
+<body>
+
+<h1 th:text="${mealPlan.name}">Meal Plan Name</h1>
+<p><strong>Created At:</strong> <span th:text="${#temporals.format(mealPlan.createdAt, 'yyyy-MM-dd HH:mm')}"></span></p>
+
+<section>
+    <h2>Planned Recipes by Day</h2>
+
+    <div th:if="${mealPlan.items.isEmpty()}">
+        <p>No recipes planned yet.</p>
+    </div>
+
+    <div th:unless="${mealPlan.items.isEmpty()}">
+        <div th:each="date : ${mealPlanDates}" style="margin-bottom: 1.5em;">
+            <h3 th:text="${#temporals.format(date, 'EEEE, dd MMM yyyy')}">Date</h3>
+            <ul>
+                <li th:each="item : ${mealPlan.items}" th:if="${item.date.equals(date)}">
+                    <span th:text="${item.recipe.name}">Recipe Name</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<a th:href="@{/mealplans}" class="button secondary">Back to Meal Plans</a>
+<a th:href="@{/mealplans/{id}/edit(id=${mealPlan.id})}" class="button">Edit Meal Plan</a>
+<form th:action="@{/mealplans/{id}/delete(id=${mealPlan.id})}" method="post" style="display:inline;">
+    <button type="submit" class="button danger"
+            onclick="return confirm('Delete this meal plan?');">Delete</button>
+</form>
+
+</body>
+</html>

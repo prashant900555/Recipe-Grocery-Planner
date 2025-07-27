@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Ingredient List</title>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" type="text/css" th:href="@{/css/styles.css}" />
+</head>
+<body>
+
+<h1>Ingredients</h1>
+<a th:href="@{/ingredients/new}" class="button">Add New Ingredient</a>
+
+<table class="styled-table">
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>Quantity</th>
+        <th>Unit</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="ingredient : ${ingredients}">
+        <td th:text="${ingredient.name}">Name</td>
+        <!-- Correct, robust decimal formatting: -->
+        <td th:text="${#numbers.formatDecimal(ingredient.quantity, 2, 2)}">Qty</td>
+        <td th:text="${ingredient.unit}">Unit</td>
+        <td>
+            <a th:href="@{/ingredients/{id}/edit(id=${ingredient.id})}" class="button small">Edit</a>
+            <form th:action="@{/ingredients/{id}/delete(id=${ingredient.id})}" method="post" style="display:inline;">
+                <button type="submit" class="button small danger" onclick="return confirm('Delete this ingredient?');">Delete</button>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<a href="/" class="button secondary">Back to Home</a>
+
+<script src="/js/scripts.js"></script>
+</body>
+</html>
