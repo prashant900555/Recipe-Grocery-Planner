@@ -4,7 +4,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -24,9 +23,7 @@ public class Ingredient {
     @NotBlank(message = "Ingredient name is required")
     private String name;
 
-    @DecimalMin(value = "0.0", inclusive = false, message = "Quantity must be greater than zero")
-    private double quantity;
-
     @NotNull(message = "Unit is required")
-    private String unit;  // e.g., g, ml, pcs ...
+    // e.g., g, ml, pcs, ...
+    private String unit;
 }
