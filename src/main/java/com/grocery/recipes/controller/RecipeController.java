@@ -10,6 +10,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Iterator;
 import java.util.List;
@@ -76,9 +77,13 @@ public class RecipeController {
         return "redirect:/recipes";
     }
 
-    @PostMapping("/{id}/delete")
-    public String deleteRecipe(@PathVariable("id") Long id) {
-        recipeService.deleteById(id);
+    @PostMapping("{id}/delete")
+    public String deleteRecipe(@PathVariable("id") Long id, RedirectAttributes redirectAttributes) {
+        try {
+            recipeService.deleteById(id);
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
         return "redirect:/recipes";
     }
 

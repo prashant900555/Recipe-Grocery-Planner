@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MealPlanItemRepository extends JpaRepository<MealPlanItem, Long> {
+    int countByRecipeId(Long recipeId);
 }
