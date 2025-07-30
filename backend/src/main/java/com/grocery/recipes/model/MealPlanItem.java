@@ -1,5 +1,6 @@
 package com.grocery.recipes.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -34,5 +35,6 @@ public class MealPlanItem {
     private Recipe recipe;
 
     @NotNull(message = "Date is required")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd-MM-yyyy")
     private LocalDate date;
 }
