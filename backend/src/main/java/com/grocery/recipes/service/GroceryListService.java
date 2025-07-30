@@ -1,17 +1,12 @@
 package com.grocery.recipes.service;
 
-import com.grocery.recipes.dto.GroceryListEntry;
-
+import com.grocery.recipes.model.GroceryList;
 import java.util.List;
+import java.util.Optional;
 
 public interface GroceryListService {
-
-    /**
-     * Generate aggregated grocery list entries for the given meal plan ID.
-     * Aggregation groups ingredients by ingredientId and unit.
-     *
-     * @param mealPlanId meal plan identifier
-     * @return list of GroceryListEntry with summed quantities
-     */
-    List<GroceryListEntry> generateGroceryList(Long mealPlanId);
+    List<GroceryList> findAll();
+    Optional<GroceryList> findById(Long id);
+    GroceryList save(GroceryList groceryList);
+    void deleteById(Long id);
 }
