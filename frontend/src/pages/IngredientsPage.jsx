@@ -101,7 +101,6 @@ export default function IngredientsPage() {
               <th className="py-3 px-4 text-left font-bold">#</th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Unit</th>
-              <th className="py-3 px-4 text-left font-bold">Default Qty</th>
               <th className="py-3 px-4"></th>
             </tr>
           </thead>
@@ -127,7 +126,6 @@ export default function IngredientsPage() {
                   <td className="py-2 px-4">{idx + 1}</td>
                   <td className="py-2 px-4 capitalize">{ing.name}</td>
                   <td className="py-2 px-4">{ing.unit}</td>
-                  <td className="py-2 px-4">{ing.quantity}</td>
                   <td className="py-2 px-4 flex gap-2">
                     <button
                       className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"

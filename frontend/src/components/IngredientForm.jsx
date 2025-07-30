@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
 
+// Predefined units for the dropdown
+const UNIT_OPTIONS = ["g", "kg", "ml", "l", "pcs", "tsp", "tbsp", "cup"];
+
 export default function IngredientForm({ onSubmit, onCancel, initialData }) {
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("");
-  const [quantity, setQuantity] = useState("");
 
   useEffect(() => {
     if (initialData) {
       setName(initialData.name || "");
       setUnit(initialData.unit || "");
-      setQuantity(initialData.quantity != null ? initialData.quantity : "");
     }
   }, [initialData]);
 
@@ -19,8 +20,7 @@ export default function IngredientForm({ onSubmit, onCancel, initialData }) {
     onSubmit({
       ...initialData,
       name: name.trim(),
-      unit: unit.trim(),
-      quantity: Number(quantity) || 0,
+      unit: unit,
     });
   }
 
@@ -42,27 +42,21 @@ export default function IngredientForm({ onSubmit, onCancel, initialData }) {
       </div>
       <div>
         <label className="block mb-1 font-semibold text-blue-700">Unit</label>
-        <input
-          type="text"
+        <select
           className="w-full border border-blue-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           value={unit}
           required
           onChange={(e) => setUnit(e.target.value)}
-          autoComplete="off"
-        />
-      </div>
-      <div>
-        <label className="block mb-1 font-semibold text-blue-700">
-          Default Quantity
-        </label>
-        <input
-          type="number"
-          className="w-full border border-blue-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          value={quantity}
-          min="0"
-          step="any"
-          onChange={(e) => setQuantity(e.target.value)}
-        />
+        >
+          <option value="" disabled>
+            -- Select Unit --
+          </option>
+          {UNIT_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="flex gap-3 justify-end mt-2">
         <button
