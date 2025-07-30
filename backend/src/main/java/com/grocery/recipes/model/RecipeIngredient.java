@@ -1,5 +1,6 @@
 package com.grocery.recipes.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -24,7 +25,7 @@ public class RecipeIngredient {
 
     @ManyToOne
     @JoinColumn(name = "recipe_id")
-    @JsonIgnore
+    @JsonBackReference
     private Recipe recipe;
 
     @ManyToOne
