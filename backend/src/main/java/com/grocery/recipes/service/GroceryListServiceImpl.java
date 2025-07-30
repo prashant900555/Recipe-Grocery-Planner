@@ -1,62 +1,38 @@
 package com.grocery.recipes.service;
 
-import com.grocery.recipes.dto.GroceryListEntry;
-import com.grocery.recipes.model.Ingredient;
-import com.grocery.recipes.model.MealPlan;
-import com.grocery.recipes.model.MealPlanItem;
-import com.grocery.recipes.model.RecipeIngredient;
-import com.grocery.recipes.repository.MealPlanRepository;
+import com.grocery.recipes.model.GroceryList;
+import com.grocery.recipes.repository.GroceryListRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class GroceryListServiceImpl implements GroceryListService {
 
-    private final MealPlanRepository mealPlanRepository;
+    private final GroceryListRepository groceryListRepository;
 
-    public GroceryListServiceImpl(MealPlanRepository mealPlanRepository) {
-        this.mealPlanRepository = mealPlanRepository;
+    public GroceryListServiceImpl(GroceryListRepository groceryListRepository) {
+        this.groceryListRepository = groceryListRepository;
     }
 
     @Override
-    public List<GroceryListEntry> generateGroceryList(Long mealPlanId) {
-        Optional<MealPlan> optionalMealPlan = mealPlanRepository.findById(mealPlanId);
-        if (optionalMealPlan.isEmpty()) {
-            return Collections.emptyList();
-        }
+    public List<GroceryList> findAll() {
+        return groceryListRepository.findAll();
+    }
 
-        MealPlan mealPlan = optionalMealPlan.get();
+    @Override
+    public Optional<GroceryList> findById(Long id) {
+        return groceryListRepository.findById(id);
+    }
 
-        // Map key by ingredientId + unit (concatenated)
-        Map<String, GroceryListEntry> aggregateMap = new LinkedHashMap<>();
+    @Override
+    public GroceryList save(GroceryList groceryList) {
+        return groceryListRepository.save(groceryList);
+    }
 
-        for (MealPlanItem mpi : mealPlan.getItems()) {
-            if (mpi.getRecipe() == null) {
-                continue;
-            }
-            for (RecipeIngredient ri : mpi.getRecipe().getIngredients()) {
-                if (ri.getIngredient() == null) {
-                    continue;
-                }
-                Ingredient ing = ri.getIngredient();
-                String key = ing.getId() + "::" + ing.getUnit();
-
-                GroceryListEntry entry = aggregateMap.get(key);
-                if (entry == null) {
-                    entry = new GroceryListEntry(
-                            ing.getId(),
-                            ing.getName(),
-                            ing.getUnit(),
-                            ri.getQuantity()
-                    );
-                    aggregateMap.put(key, entry);
-                } else {
-                    entry.setQuantity(entry.getQuantity() + ri.getQuantity());
-                }
-            }
-        }
-
-        return new ArrayList<>(aggregateMap.values());
+    @Override
+    public void deleteById(Long id) {
+        groceryListRepository.deleteById(id);
     }
 }

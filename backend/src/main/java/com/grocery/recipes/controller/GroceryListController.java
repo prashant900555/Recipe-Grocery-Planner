@@ -1,82 +1,57 @@
 package com.grocery.recipes.controller;
 
-import com.grocery.recipes.dto.GroceryListEntry;
-import com.grocery.recipes.model.MealPlan;
+import com.grocery.recipes.model.GroceryList;
 import com.grocery.recipes.service.GroceryListService;
-import com.grocery.recipes.service.MealPlanService;
-import jakarta.validation.Valid;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Optional;
 
-@Controller
-@RequestMapping("/grocerylist")
+@RestController
+@RequestMapping("/api/grocerylists")
+@CrossOrigin(origins = "*")
 public class GroceryListController {
 
-    private final MealPlanService mealPlanService;
     private final GroceryListService groceryListService;
 
-    public GroceryListController(MealPlanService mealPlanService, GroceryListService groceryListService) {
-        this.mealPlanService = mealPlanService;
+    public GroceryListController(GroceryListService groceryListService) {
         this.groceryListService = groceryListService;
     }
 
-    /**
-     * Display page to select a Meal Plan for grocery list generation.
-     */
     @GetMapping
-    public String selectMealPlan(Model model, @RequestParam(name = "mealPlanId", required = false) Long mealPlanId) {
-        List<MealPlan> mealPlans = mealPlanService.findAll();
-        model.addAttribute("mealPlans", mealPlans);
-
-        if (mealPlanId != null) {
-            model.addAttribute("selectedMealPlanId", mealPlanId);
-            List<GroceryListEntry> groceryList = groceryListService.generateGroceryList(mealPlanId);
-            model.addAttribute("groceryList", groceryList);
-        }
-
-        return "grocerylist/list";
+    public List<GroceryList> getAllGroceryLists() {
+        return groceryListService.findAll();
     }
 
-    /**
-     * Save updated grocery list quantities in-memory (simulate save).
-     * Since no persistence, simply redisplay with updated quantities.
-     */
+    @GetMapping("/{id}")
+    public ResponseEntity<GroceryList> getGroceryList(@PathVariable Long id) {
+        Optional<GroceryList> groceryListOpt = groceryListService.findById(id);
+        return groceryListOpt.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PostMapping
-    public String saveGroceryList(
-            @RequestParam(name = "mealPlanId") Long mealPlanId,
-            @RequestParam(value = "ingredientIds") List<Long> ingredientIds,
-            @RequestParam(value = "quantities") List<Double> quantities,
-            Model model) {
+    public ResponseEntity<GroceryList> createGroceryList(@RequestBody GroceryList groceryList) {
+        GroceryList saved = groceryListService.save(groceryList);
+        return new ResponseEntity<>(saved, HttpStatus.CREATED);
+    }
 
-        List<MealPlan> mealPlans = mealPlanService.findAll();
-        model.addAttribute("mealPlans", mealPlans);
-        model.addAttribute("selectedMealPlanId", mealPlanId);
-
-        // Generate fresh grocery list
-        List<GroceryListEntry> groceryList = groceryListService.generateGroceryList(mealPlanId);
-
-        // Map entries by ingredientId for easy updates
-        var entryMap = groceryList.stream()
-                .collect(java.util.stream.Collectors.toMap(GroceryListEntry::getIngredientId, e -> e));
-
-        // Update quantities from POST-ed values
-        for (int i = 0; i < ingredientIds.size(); i++) {
-            Long ingId = ingredientIds.get(i);
-            double qty = quantities.get(i);
-            GroceryListEntry entry = entryMap.get(ingId);
-            if (entry != null) {
-                entry.setQuantity(qty);
-            }
+    @PutMapping("/{id}")
+    public ResponseEntity<GroceryList> updateGroceryList(
+            @PathVariable Long id,
+            @RequestBody GroceryList groceryList) {
+        if (!groceryListService.findById(id).isPresent()) {
+            return ResponseEntity.notFound().build();
         }
+        groceryList.setId(id);
+        GroceryList updated = groceryListService.save(groceryList);
+        return ResponseEntity.ok(updated);
+    }
 
-        model.addAttribute("groceryList", groceryList);
-
-        // Do NOT persist grocery list per requirements
-
-        return "grocerylist/list";
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteGroceryList(@PathVariable Long id) {
+        groceryListService.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

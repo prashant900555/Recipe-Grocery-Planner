@@ -1,11 +1,11 @@
 package com.grocery.recipes.service;
 
 import com.grocery.recipes.model.Recipe;
+import com.grocery.recipes.model.RecipeIngredient;
 import com.grocery.recipes.repository.MealPlanItemRepository;
 import com.grocery.recipes.repository.RecipeRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.Optional;
 
@@ -32,8 +32,12 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     public Recipe save(Recipe recipe) {
-        // Due to cascade ALL on RecipeIngredient in Recipe entity,
-        // saving the Recipe will save ingredients as well.
+        // --- KEY: Set parent reference on each RecipeIngredient ---
+        if (recipe.getIngredients() != null) {
+            for (RecipeIngredient ri : recipe.getIngredients()) {
+                ri.setRecipe(recipe);
+            }
+        }
         return recipeRepository.save(recipe);
     }
 

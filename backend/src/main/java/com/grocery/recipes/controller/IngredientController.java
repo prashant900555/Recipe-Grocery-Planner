@@ -2,15 +2,15 @@ package com.grocery.recipes.controller;
 
 import com.grocery.recipes.model.Ingredient;
 import com.grocery.recipes.service.IngredientService;
-import jakarta.validation.Valid;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import java.util.List;
+import java.util.Optional;
 
-@Controller
-@RequestMapping("/ingredients")
+@RestController
+@RequestMapping("/api/ingredients")
+@CrossOrigin(origins = "*")
 public class IngredientController {
 
     private final IngredientService ingredientService;
@@ -19,51 +19,48 @@ public class IngredientController {
         this.ingredientService = ingredientService;
     }
 
+    // GET /api/ingredients
     @GetMapping
-    public String listIngredients(Model model) {
-        model.addAttribute("ingredients", ingredientService.findAll());
-        return "ingredients/list";
+    public List<Ingredient> getAllIngredients() {
+        return ingredientService.findAll();
     }
 
-    @GetMapping("/new")
-    public String newIngredientForm(Model model) {
-        model.addAttribute("ingredient", new Ingredient());
-        return "ingredients/form";
+    // GET /api/ingredients/{id}
+    @GetMapping("/{id}")
+    public ResponseEntity<Ingredient> getIngredient(@PathVariable Long id) {
+        Optional<Ingredient> ingredientOpt = ingredientService.findById(id);
+        return ingredientOpt.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    // POST /api/ingredients
     @PostMapping
-    public String createIngredient(@Valid @ModelAttribute("ingredient") Ingredient ingredient, BindingResult result) {
-        if (result.hasErrors()) {
-            return "ingredients/form";
-        }
-        ingredientService.save(ingredient);
-        return "redirect:/ingredients";
+    public ResponseEntity<Ingredient> createIngredient(@RequestBody Ingredient ingredient) {
+        Ingredient saved = ingredientService.save(ingredient);
+        return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
-    @GetMapping("/{id}/edit")
-    public String editIngredientForm(@PathVariable("id") Long id, Model model) {
-        Ingredient ingredient = ingredientService.findById(id).orElseThrow(() -> new IllegalArgumentException("Invalid ingredient Id:" + id));
-        model.addAttribute("ingredient", ingredient);
-        return "ingredients/form";
-    }
-
-    @PostMapping("/{id}")
-    public String updateIngredient(@PathVariable("id") Long id, @Valid @ModelAttribute("ingredient") Ingredient ingredient, BindingResult result) {
-        if (result.hasErrors()) {
-            return "ingredients/form";
+    // PUT /api/ingredients/{id}
+    @PutMapping("/{id}")
+    public ResponseEntity<Ingredient> updateIngredient(
+            @PathVariable Long id,
+            @RequestBody Ingredient ingredient) {
+        if (!ingredientService.findById(id).isPresent()) {
+            return ResponseEntity.notFound().build();
         }
         ingredient.setId(id);
-        ingredientService.save(ingredient);
-        return "redirect:/ingredients";
+        Ingredient updated = ingredientService.save(ingredient);
+        return ResponseEntity.ok(updated);
     }
 
-    @PostMapping("/{id}/delete")
-    public String deleteIngredient(@PathVariable("id") Long id, RedirectAttributes redirectAttributes) {
+    // DELETE /api/ingredients/{id}
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteIngredient(@PathVariable Long id) {
         try {
             ingredientService.deleteById(id);
+            return ResponseEntity.noContent().build();
         } catch (IllegalStateException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
-        return "redirect:/ingredients";
     }
 }
