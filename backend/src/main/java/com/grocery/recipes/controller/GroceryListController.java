@@ -2,6 +2,7 @@ package com.grocery.recipes.controller;
 
 import com.grocery.recipes.model.GroceryList;
 import com.grocery.recipes.service.GroceryListService;
+import com.grocery.recipes.service.GroceryListServiceImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,7 +41,8 @@ public class GroceryListController {
     @PutMapping("/{id}")
     public ResponseEntity<GroceryList> updateGroceryList(
             @PathVariable Long id,
-            @RequestBody GroceryList groceryList) {
+            @RequestBody GroceryList groceryList
+    ) {
         if (!groceryListService.findById(id).isPresent()) {
             return ResponseEntity.notFound().build();
         }
@@ -54,4 +56,16 @@ public class GroceryListController {
         groceryListService.deleteById(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/generate/mealplan/{mealPlanId}")
+    public ResponseEntity<GroceryList> generateFromMealPlan(
+            @PathVariable Long mealPlanId,
+            @RequestParam String name,
+            @RequestParam String date) {
+        GroceryList glist = ((GroceryListServiceImpl) groceryListService)
+                .generateFromMealPlan(mealPlanId, name, date);
+        // Do NOT save here! Just return the generated grocery list
+        return new ResponseEntity<>(glist, HttpStatus.OK);
+    }
+
 }
