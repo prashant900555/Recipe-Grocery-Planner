@@ -30,14 +30,11 @@ export async function generateFromMealPlan(mealPlanId, name, date) {
   return res.data;
 }
 
-// Generate grocery list from recipe ids (tick automation)
 export async function generateFromRecipes(recipeIds, name, date) {
-  const res = await axios.post(
-    "http://localhost:8080/api/grocerylists/generate/recipes?name=" +
-      encodeURIComponent(name) +
-      "&date=" +
-      encodeURIComponent(date),
-    recipeIds
-  );
+  const res = await axios.post(`${API_URL}/generaterecipes`, {
+    recipeIds,
+    name,
+    date,
+  });
   return res.data;
 }

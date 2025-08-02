@@ -5,7 +5,9 @@ import {
   updateRecipe,
   deleteRecipe,
 } from "../services/recipeService";
+import { generateFromRecipes } from "../services/groceryListService";
 import RecipeForm from "../components/RecipeForm";
+import { useNavigate } from "react-router-dom";
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
@@ -13,6 +15,12 @@ export default function RecipesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editRecipe, setEditRecipe] = useState(null);
   const [error, setError] = useState();
+  const [selected, setSelected] = useState([]);
+  const [listName, setListName] = useState("");
+  const [listDate, setListDate] = useState("");
+  const [generating, setGenerating] = useState(false);
+
+  const navigate = useNavigate();
 
   const fetchAll = async () => {
     setLoading(true);
@@ -61,6 +69,60 @@ export default function RecipesPage() {
     }
   }
 
+  function toggleSelect(id) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  async function handleGenerateList() {
+    if (!listName.trim()) {
+      setError("Please enter a name for the grocery list.");
+      return;
+    }
+    if (!listDate.trim()) {
+      setError("Please enter a date for the grocery list.");
+      return;
+    }
+    setGenerating(true);
+    setError();
+    try {
+      await generateFromRecipes(selected, listName.trim(), listDate);
+      setGenerating(false);
+      navigate("/grocerylists");
+    } catch (e) {
+      // Show error in UI, and log all details to the console:
+      let message = "Failed to generate grocery list.";
+      if (e.response?.data) {
+        if (typeof e.response.data === "string") {
+          message = e.response.data;
+        } else if (e.response.data.message) {
+          message = e.response.data.message;
+        } else {
+          message = JSON.stringify(e.response.data);
+        }
+      } else if (e.message) {
+        message = e.message;
+      }
+      setError(message);
+      // Debug log to browser console
+      console.error("Grocery list generation failed:", e, e.response?.data);
+      setGenerating(false);
+    }
+  }
+
+  function todayDDMMYYYY() {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  }
+
+  useEffect(() => {
+    setListDate(todayDDMMYYYY());
+  }, []);
+
   return (
     <section className="max-w-4xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
@@ -72,7 +134,7 @@ export default function RecipesPage() {
             setEditRecipe(null);
           }}
         >
-          + Add Recipe
+          Add Recipe
         </button>
       </div>
       {error && (
@@ -80,6 +142,41 @@ export default function RecipesPage() {
           {error}
         </div>
       )}
+
+      <div className="mb-6 border p-4 rounded bg-blue-50">
+        <span className="font-semibold mr-3">
+          Select recipes to generate a grocery list:
+        </span>
+        <input
+          type="text"
+          placeholder="List name"
+          className="border rounded px-2 py-1 mr-2"
+          value={listName}
+          onChange={(e) => setListName(e.target.value)}
+          required
+        />
+        <input
+          type="date"
+          className="border rounded px-2 py-1 mr-2"
+          value={(() => {
+            const [dd, mm, yyyy] = listDate.split("-");
+            return `${yyyy}-${mm}-${dd}`;
+          })()}
+          onChange={(e) => {
+            // Convert YYYY-MM-DD to DD-MM-YYYY
+            const [yyyy, mm, dd] = e.target.value.split("-");
+            setListDate(`${dd}-${mm}-${yyyy}`);
+          }}
+          required
+        />
+        <button
+          className="px-3 py-1 bg-green-700 text-white rounded"
+          onClick={handleGenerateList}
+          disabled={generating || selected.length === 0}
+        >
+          {generating ? "Generating..." : "Generate Grocery List"}
+        </button>
+      </div>
 
       {showForm && (
         <div className="mb-10">
@@ -93,16 +190,15 @@ export default function RecipesPage() {
           />
         </div>
       )}
-
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm rounded-md">
           <thead className="bg-gray-100">
             <tr>
-              <th className="py-3 px-4 text-left font-bold">#</th>
+              <th></th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Description</th>
               <th className="py-3 px-4 text-left font-bold">Ingredients</th>
-              <th className="py-3 px-4"></th>
+              <th></th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
@@ -124,7 +220,13 @@ export default function RecipesPage() {
             ) : (
               recipes.map((rec, idx) => (
                 <tr key={rec.id} className="hover:bg-blue-50 transition">
-                  <td className="py-2 px-4">{idx + 1}</td>
+                  <td className="py-2 px-4">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(rec.id)}
+                      onChange={() => toggleSelect(rec.id)}
+                    />
+                  </td>
                   <td className="py-2 px-4 capitalize">{rec.name}</td>
                   <td className="py-2 px-4">{rec.description}</td>
                   <td className="py-2 px-4">
@@ -132,16 +234,15 @@ export default function RecipesPage() {
                       <ul className="list-disc pl-4">
                         {rec.ingredients.map((ri) =>
                           ri.ingredient ? (
-                            <li key={ri.id || ri.ingredient.id}>
+                            <li key={ri.id || Math.random()}>
                               {ri.quantity} {ri.ingredient.unit}{" "}
-                              {ri.ingredient.name}
-                              {ri.note ? ` (${ri.note})` : ""}
+                              {ri.ingredient.name} {ri.note ? ri.note : ""}
                             </li>
                           ) : null
                         )}
                       </ul>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-gray-400-span"></span>
                     )}
                   </td>
                   <td className="py-2 px-4 flex gap-2">
@@ -155,7 +256,7 @@ export default function RecipesPage() {
                       Edit
                     </button>
                     <button
-                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-700"
                       onClick={() => handleDelete(rec.id)}
                     >
                       Delete
