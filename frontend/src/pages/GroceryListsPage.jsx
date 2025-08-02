@@ -124,17 +124,15 @@ export default function GroceryListsPage() {
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-100 text-sm rounded-md">
+        <table className="min-w-full text-sm rounded-md">
           <thead className="bg-pink-50">
             <tr>
-              <th className="py-3 px-4 text-left font-bold">#</th>
-              <th className="py-3 px-4 text-left font-bold">Name</th>
-              <th className="py-3 px-4 text-left font-bold">Date</th>
               <th className="py-3 px-4 text-left font-bold">Items</th>
               <th className="py-3 px-4"></th>
+              <th className="py-3 px-4 text-left font-bold">Date</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-50">
+          <tbody className="bg-white">
             {loading ? (
               <tr>
                 <td colSpan={5} className="text-center py-8 text-gray-400">
@@ -152,10 +150,16 @@ export default function GroceryListsPage() {
               </tr>
             ) : (
               lists.map((list, idx) => (
-                <tr key={list.id} className="hover:bg-pink-50 transition">
-                  <td className="py-2 px-4">{idx + 1}</td>
-                  <td className="py-2 px-4">{list.name}</td>
-                  <td className="py-2 px-4">{list.date || "-"}</td>
+                <tr
+                  key={list.id}
+                  className={
+                    "hover:bg-pink-50 transition" +
+                    (idx > 0
+                      ? " border-t border-gray-200 dark:border-gray-300"
+                      : "")
+                  }
+                >
+                  {/* Itemboxes */}
                   <td className="py-2 px-4">
                     {list.entries && list.entries.length > 0 ? (
                       <ul className="list-none pl-0 m-0">
@@ -192,6 +196,7 @@ export default function GroceryListsPage() {
                       <span className="text-gray-400">-</span>
                     )}
                   </td>
+                  {/* Buttons */}
                   <td className="py-2 px-4 flex gap-2">
                     <button
                       className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -209,6 +214,8 @@ export default function GroceryListsPage() {
                       Delete
                     </button>
                   </td>
+                  {/* Date */}
+                  <td className="py-2 px-4">{list.date || "-"}</td>
                 </tr>
               ))
             )}

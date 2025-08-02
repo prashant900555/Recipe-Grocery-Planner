@@ -59,7 +59,7 @@ export default function HomePage() {
       desc: "Plan your week",
     },
     {
-      label: "Grocery List",
+      label: "Grocery Lists",
       color: "bg-pink-500 hover:bg-pink-600",
       icon: (
         <svg
