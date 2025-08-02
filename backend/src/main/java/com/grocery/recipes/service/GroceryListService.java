@@ -9,4 +9,6 @@ public interface GroceryListService {
     Optional<GroceryList> findById(Long id);
     GroceryList save(GroceryList groceryList);
     void deleteById(Long id);
+    // NEW: Generate grocery list from recipe IDs
+    GroceryList generateFromRecipes(List<Long> recipeIds, String listName, String shoppingDate);
 }

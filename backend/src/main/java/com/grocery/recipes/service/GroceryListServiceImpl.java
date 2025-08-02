@@ -117,4 +117,45 @@ public class GroceryListServiceImpl implements GroceryListService {
         return glist;
     }
 
+    @Override
+    public GroceryList generateFromRecipes(List<Long> recipeIds, String listName, String shoppingDate) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            throw new IllegalArgumentException("Recipe IDs cannot be null or empty");
+        }
+        Map<String, GroceryListEntry> merged = new LinkedHashMap<>();
+
+        for (Long recipeId : recipeIds) {
+            Recipe recipe = recipeRepository.findById(recipeId)
+                    .orElseThrow(() -> new IllegalArgumentException("Recipe not found: " + recipeId));
+            for (RecipeIngredient ri : recipe.getIngredients()) {
+                if (ri.getIngredient() == null) continue;
+                String key = ri.getIngredient().getId() + "_" + ri.getIngredient().getUnit();
+                if (merged.containsKey(key)) {
+                    GroceryListEntry entry = merged.get(key);
+                    entry.setQuantity(entry.getQuantity() + ri.getQuantity());
+                } else {
+                    GroceryListEntry entry = new GroceryListEntry();
+                    entry.setIngredientId(ri.getIngredient().getId());
+                    entry.setIngredientName(ri.getIngredient().getName());
+                    entry.setUnit(ri.getIngredient().getUnit());
+                    entry.setQuantity(ri.getQuantity());
+                    entry.setNote(ri.getNote() == null ? "" : ri.getNote());
+                    entry.setPurchased(false);
+                    merged.put(key, entry);
+                }
+            }
+        }
+
+        GroceryList glist = new GroceryList();
+        glist.setName(listName);
+        glist.setDate(shoppingDate);
+        glist.setEntries(new ArrayList<>(merged.values()));
+        glist.setMealPlan(null);
+
+        return groceryListRepository.save(glist);
+    }
+
+
+
+
 }
