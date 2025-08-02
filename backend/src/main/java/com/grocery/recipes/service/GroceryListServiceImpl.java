@@ -165,4 +165,13 @@ public class GroceryListServiceImpl implements GroceryListService {
         return groceryListRepository.save(glist);
     }
 
+    @Override
+    public void updateEntryPurchased(Long entryId, boolean purchased) {
+        Optional<GroceryListEntry> entryOpt = groceryListRepository.findEntryById(entryId);
+        if (entryOpt.isEmpty()) throw new IllegalArgumentException("Entry not found");
+        GroceryListEntry entry = entryOpt.get();
+        entry.setPurchased(purchased);
+        groceryListRepository.saveEntry(entry);
+    }
+
 }

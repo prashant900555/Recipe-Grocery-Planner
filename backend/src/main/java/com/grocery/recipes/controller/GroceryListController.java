@@ -108,6 +108,23 @@ public class GroceryListController {
         }
     }
 
+    @PatchMapping("/entries/{entryId}/purchased")
+    public ResponseEntity<?> updateEntryPurchasedStatus(
+            @PathVariable Long entryId,
+            @RequestBody Map<String, Boolean> payload
+    ) {
+        if (!payload.containsKey("purchased")) {
+            return ResponseEntity.badRequest().body("Missing 'purchased' field.");
+        }
+        boolean purchased = payload.get("purchased");
+        try {
+            groceryListService.updateEntryPurchased(entryId, purchased);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+
 
 
 }

@@ -14,4 +14,7 @@ public interface GroceryListService {
 
     // NEW: Generate grocery list from multiple meal plan IDs
     GroceryList generateFromMealPlans(List<Long> mealPlanIds, String listName, String shoppingDate);
+
+    void updateEntryPurchased(Long entryId, boolean purchased);
+
 }
