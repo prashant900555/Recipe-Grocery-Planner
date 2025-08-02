@@ -39,3 +39,12 @@ export async function generateFromMealPlans(mealPlanIds, name, date) {
   });
   return res.data;
 }
+
+export async function updateEntryPurchased(entryId, purchased) {
+  await axios.patch(
+    `http://localhost:8080/api/grocerylists/entries/${entryId}/purchased`,
+    {
+      purchased,
+    }
+  );
+}

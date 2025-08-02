@@ -4,6 +4,7 @@ import {
   createGroceryList,
   updateGroceryList,
   deleteGroceryList,
+  updateEntryPurchased,
 } from "../services/groceryListService";
 import GroceryListForm from "../components/GroceryListForm";
 import { useNavigate } from "react-router-dom";
@@ -63,10 +64,25 @@ export default function GroceryListsPage() {
     }
   }
 
-  function showPurchasedCount(entries) {
-    if (!entries || !entries.length) return "0";
-    const done = entries.filter((e) => e.purchased);
-    return `${done.length} / ${entries.length}`;
+  // This now uses the PATCH API to avoid concurrent version errors
+  async function handleTogglePurchased(listId, entryId, currentValue) {
+    try {
+      // Optimistically update UI
+      const newLists = lists.map((l) => {
+        if (l.id !== listId) return l;
+        const updatedEntries = l.entries.map((e) =>
+          e.id === entryId ? { ...e, purchased: !currentValue } : e
+        );
+        return { ...l, entries: updatedEntries };
+      });
+      setLists(newLists);
+
+      // Send PATCH update for this entry only
+      await updateEntryPurchased(entryId, !currentValue);
+    } catch {
+      fetchAll();
+      setError("Failed to update purchased status.");
+    }
   }
 
   return (
@@ -115,21 +131,20 @@ export default function GroceryListsPage() {
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Date</th>
               <th className="py-3 px-4 text-left font-bold">Items</th>
-              <th className="py-3 px-4 text-left font-bold">Purchased</th>
               <th className="py-3 px-4"></th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-50">
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-400">
+                <td colSpan={5} className="text-center py-8 text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : lists.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={5}
                   className="text-center py-10 text-gray-300 font-semibold"
                 >
                   No grocery lists found.
@@ -143,21 +158,39 @@ export default function GroceryListsPage() {
                   <td className="py-2 px-4">{list.date || "-"}</td>
                   <td className="py-2 px-4">
                     {list.entries && list.entries.length > 0 ? (
-                      <ul className="list-disc pl-4">
-                        {list.entries.map((e, i) => (
-                          <li key={e.ingredientId + "-" + i}>
-                            {e.quantity} {e.unit} {e.ingredientName}
-                            {e.note ? ` (${e.note})` : ""}
-                            {e.purchased ? "✓" : ""}
+                      <ul className="list-none pl-0 m-0">
+                        {list.entries.map((entry) => (
+                          <li
+                            key={entry.id}
+                            className="flex items-center gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!entry.purchased}
+                              onChange={() =>
+                                handleTogglePurchased(
+                                  list.id,
+                                  entry.id,
+                                  !!entry.purchased
+                                )
+                              }
+                              className="w-5 h-5 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                            />
+                            <span>
+                              {entry.quantity} {entry.unit}{" "}
+                              {entry.ingredientName}
+                            </span>
+                            {entry.note && (
+                              <span className="text-gray-500 ml-1 text-sm">
+                                ({entry.note})
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>
                     ) : (
                       <span className="text-gray-400">-</span>
                     )}
-                  </td>
-                  <td className="py-2 px-4">
-                    {showPurchasedCount(list.entries)}
                   </td>
                   <td className="py-2 px-4 flex gap-2">
                     <button
