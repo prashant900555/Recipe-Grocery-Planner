@@ -80,6 +80,34 @@ public class GroceryListController {
         }
     }
 
+    @PostMapping("/generate/mealplans")
+    public ResponseEntity<?> generateFromMealPlans(@RequestBody Map<String, Object> payload) {
+        try {
+            if (
+                    !payload.containsKey("mealPlanIds") ||
+                            !payload.containsKey("name") ||
+                            !payload.containsKey("date")
+            ) {
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .body("mealPlanIds, name, and date are required.");
+            }
+
+            List<?> mealPlanIdsRaw = (List<?>) payload.get("mealPlanIds");
+            List<Long> mealPlanIds = mealPlanIdsRaw.stream().map(id -> ((Number) id).longValue()).toList();
+            String listName = (String) payload.get("name");
+            String date = (String) payload.get("date");
+
+            GroceryList glist = groceryListService.generateFromMealPlans(mealPlanIds, listName, date);
+            return new ResponseEntity<>(glist, HttpStatus.CREATED);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body("Failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
 
 
 }
