@@ -5,7 +5,10 @@ import {
   updateMealPlan,
   deleteMealPlan,
 } from "../services/mealPlanService";
-import { generateFromMealPlans } from "../services/groceryListService";
+import {
+  generateFromMealPlans,
+  getGroceryLists,
+} from "../services/groceryListService";
 import MealPlanForm from "../components/MealPlanForm";
 import { useNavigate } from "react-router-dom";
 
@@ -16,12 +19,13 @@ export default function MealPlansPage() {
   const [editPlan, setEditPlan] = useState(null);
   const [error, setError] = useState();
   const [selected, setSelected] = useState([]);
-  const [listName, setListName] = useState("");
   const [listDate, setListDate] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [hasActiveGroceryList, setHasActiveGroceryList] = useState(false);
 
   const navigate = useNavigate();
 
+  // Fetch all meal plans
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -34,9 +38,21 @@ export default function MealPlansPage() {
     }
   };
 
+  // Check for any active grocery list (completed === false)
+  const checkActiveGroceryList = async () => {
+    try {
+      const lists = await getGroceryLists();
+      setHasActiveGroceryList(lists.some((l) => !l.completed));
+    } catch {
+      setHasActiveGroceryList(false);
+    }
+  };
+
   useEffect(() => {
     fetchAll();
     setListDate(todayDDMMYYYY());
+    checkActiveGroceryList();
+    // eslint-disable-next-line
   }, []);
 
   async function handleCreate(data) {
@@ -76,19 +92,29 @@ export default function MealPlansPage() {
     );
   }
 
+  // Generate dynamic name: join plan names with _ then add _{date}_List
+  function dynamicGroceryListName() {
+    if (!selected.length) return "";
+    const plans = mealPlans.filter((mp) => selected.includes(mp.id));
+    const names = plans.map((mp) => mp.name || "MealPlan");
+    const joinedName = names.join("_");
+    return `${joinedName}_${listDate}_List`;
+  }
+
   async function handleGenerate() {
-    if (!listName.trim()) {
-      setError("Please enter a name for the grocery list.");
-      return;
-    }
     if (!listDate.trim()) {
       setError("Please enter a date for the grocery list.");
+      return;
+    }
+    if (selected.length === 0) {
+      setError("Please select at least one meal plan.");
       return;
     }
     setGenerating(true);
     setError();
     try {
-      await generateFromMealPlans(selected, listName.trim(), listDate);
+      const autoName = dynamicGroceryListName();
+      await generateFromMealPlans(selected, autoName, listDate);
       setGenerating(false);
       navigate("/grocerylists");
     } catch (e) {
@@ -112,6 +138,11 @@ export default function MealPlansPage() {
     const yyyy = now.getFullYear();
     return `${dd}-${mm}-${yyyy}`;
   }
+
+  useEffect(() => {
+    checkActiveGroceryList();
+    // eslint-disable-next-line
+  }, [selected, listDate, showForm]);
 
   return (
     <section className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
@@ -146,13 +177,7 @@ export default function MealPlansPage() {
         <span className="font-semibold mr-2">
           Select meal plans to generate a grocery list
         </span>
-        <input
-          type="text"
-          placeholder="Enter grocery list name"
-          className="border rounded px-2 py-1 mr-2"
-          value={listName}
-          onChange={(e) => setListName(e.target.value)}
-        />
+        {/* No name input, no name label shown */}
         <input
           type="date"
           className="border rounded px-2 py-1 mr-2"
@@ -170,10 +195,16 @@ export default function MealPlansPage() {
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
           onClick={handleGenerate}
-          disabled={generating || selected.length === 0}
+          disabled={generating || selected.length === 0 || hasActiveGroceryList}
         >
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
+        {hasActiveGroceryList && (
+          <span className="ml-2 px-2 py-1 text-sm bg-red-100 text-red-700 rounded">
+            You must first mark your current active grocery list as purchased
+            before creating another.
+          </span>
+        )}
       </div>
 
       {showForm && (

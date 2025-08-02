@@ -5,7 +5,10 @@ import {
   updateRecipe,
   deleteRecipe,
 } from "../services/recipeService";
-import { generateFromRecipes } from "../services/groceryListService";
+import {
+  generateFromRecipes,
+  getGroceryLists,
+} from "../services/groceryListService";
 import RecipeForm from "../components/RecipeForm";
 import { useNavigate } from "react-router-dom";
 
@@ -18,9 +21,11 @@ export default function RecipesPage() {
   const [selected, setSelected] = useState([]);
   const [listDate, setListDate] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [hasActiveGroceryList, setHasActiveGroceryList] = useState(false);
   const navigate = useNavigate();
 
-  const fetchAll = async () => {
+  // Fetch recipes
+  const fetchAllRecipes = async () => {
     setLoading(true);
     try {
       setRecipes(await getRecipes());
@@ -32,16 +37,28 @@ export default function RecipesPage() {
     }
   };
 
+  // Fetch grocery lists and check for any active (not purchased) list
+  const checkActiveGroceryList = async () => {
+    try {
+      const lists = await getGroceryLists();
+      setHasActiveGroceryList(lists.some((l) => !l.completed));
+    } catch {
+      setHasActiveGroceryList(false);
+    }
+  };
+
   useEffect(() => {
-    fetchAll();
+    fetchAllRecipes();
     setListDate(todayDDMMYYYY());
+    checkActiveGroceryList();
+    // eslint-disable-next-line
   }, []);
 
   async function handleCreate(data) {
     try {
       await createRecipe(data);
       setShowForm(false);
-      fetchAll();
+      fetchAllRecipes();
     } catch {
       setError("Failed to create recipe.");
     }
@@ -52,7 +69,7 @@ export default function RecipesPage() {
       await updateRecipe(data.id, data);
       setShowForm(false);
       setEditRecipe(null);
-      fetchAll();
+      fetchAllRecipes();
     } catch {
       setError("Failed to update recipe.");
     }
@@ -62,7 +79,7 @@ export default function RecipesPage() {
     if (!window.confirm("Delete this recipe?")) return;
     try {
       await deleteRecipe(id);
-      fetchAll();
+      fetchAllRecipes();
     } catch {
       setError("Failed to delete recipe.");
     }
@@ -86,8 +103,7 @@ export default function RecipesPage() {
     setGenerating(true);
     setError();
     try {
-      // Use dynamic name: Recipe_{date}_{id}
-      const dateStr = listDate; // already in DD-MM-YYYY
+      const dateStr = listDate;
       const firstId = selected[0];
       const dynamicName = `Recipe_${dateStr}_${firstId}`;
       await generateFromRecipes(selected, dynamicName, listDate);
@@ -115,6 +131,12 @@ export default function RecipesPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
+  // Whenever selection or date changes, ensure we check for an active grocery list (e.g. if new tab, etc.)
+  useEffect(() => {
+    checkActiveGroceryList();
+    // eslint-disable-next-line
+  }, [selected, listDate, showForm]);
+
   return (
     <section className="max-w-4xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
       <button
@@ -141,7 +163,6 @@ export default function RecipesPage() {
           {error}
         </div>
       )}
-      {/* Selection and Generate */}
       <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
         <span className="font-semibold mr-2">
           Select recipes to generate a grocery list
@@ -162,10 +183,16 @@ export default function RecipesPage() {
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
           onClick={handleGenerateList}
-          disabled={generating || selected.length === 0}
+          disabled={generating || selected.length === 0 || hasActiveGroceryList}
         >
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
+        {hasActiveGroceryList && (
+          <span className="ml-2 px-2 py-1 text-sm bg-red-100 text-red-700 rounded">
+            You must first mark your current active grocery list as purchased
+            before creating another.
+          </span>
+        )}
       </div>
       {showForm && (
         <div className="mb-10">
