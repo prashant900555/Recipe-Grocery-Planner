@@ -5,7 +5,9 @@ import {
   updateMealPlan,
   deleteMealPlan,
 } from "../services/mealPlanService";
+import { generateFromMealPlans } from "../services/groceryListService";
 import MealPlanForm from "../components/MealPlanForm";
+import { useNavigate } from "react-router-dom";
 
 export default function MealPlansPage() {
   const [mealPlans, setMealPlans] = useState([]);
@@ -13,6 +15,12 @@ export default function MealPlansPage() {
   const [showForm, setShowForm] = useState(false);
   const [editPlan, setEditPlan] = useState(null);
   const [error, setError] = useState();
+  const [selected, setSelected] = useState([]);
+  const [listName, setListName] = useState("");
+  const [listDate, setListDate] = useState(todayDDMMYYYY());
+  const [generating, setGenerating] = useState(false);
+
+  const navigate = useNavigate();
 
   const fetchAll = async () => {
     setLoading(true);
@@ -61,6 +69,53 @@ export default function MealPlansPage() {
     }
   }
 
+  function toggleSelect(id) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  async function handleGenerateList() {
+    if (!listName.trim()) {
+      setError("Please enter a name for the grocery list.");
+      return;
+    }
+    if (!listDate.trim()) {
+      setError("Please enter a date for the grocery list.");
+      return;
+    }
+    setGenerating(true);
+    setError();
+    try {
+      await generateFromMealPlans(selected, listName.trim(), listDate);
+      setGenerating(false);
+      navigate("/grocerylists");
+    } catch (e) {
+      let message = "Failed to generate grocery list.";
+      if (e.response?.data) {
+        if (typeof e.response.data === "string") message = e.response.data;
+        else if (e.response.data.message) message = e.response.data.message;
+        else message = JSON.stringify(e.response.data);
+      } else if (e.message) {
+        message = e.message;
+      }
+      setError(message);
+      setGenerating(false);
+    }
+  }
+
+  function todayDDMMYYYY() {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  }
+
+  useEffect(() => {
+    setListDate(todayDDMMYYYY());
+  }, []);
+
   return (
     <section className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
@@ -81,6 +136,41 @@ export default function MealPlansPage() {
         </div>
       )}
 
+      {/* Selection and Generate */}
+      <div className="mb-6 border p-4 rounded bg-blue-50">
+        <span className="font-semibold mr-3">
+          Select meal plans to generate a grocery list
+        </span>
+        <input
+          type="text"
+          placeholder="List name"
+          className="border rounded px-2 py-1 mr-2"
+          value={listName}
+          onChange={(e) => setListName(e.target.value)}
+          required
+        />
+        <input
+          type="date"
+          className="border rounded px-2 py-1 mr-2"
+          value={(() => {
+            const [dd, mm, yyyy] = listDate.split("-");
+            return `${yyyy}-${mm}-${dd}`;
+          })()}
+          onChange={(e) => {
+            const [yyyy, mm, dd] = e.target.value.split("-");
+            setListDate(`${dd}-${mm}-${yyyy}`);
+          }}
+          required
+        />
+        <button
+          className="px-3 py-1 bg-green-700 text-white rounded"
+          onClick={handleGenerateList}
+          disabled={generating || selected.length === 0}
+        >
+          {generating ? "Generating..." : "Generate Grocery List"}
+        </button>
+      </div>
+
       {showForm && (
         <div className="mb-10">
           <MealPlanForm
@@ -93,30 +183,32 @@ export default function MealPlansPage() {
           />
         </div>
       )}
-
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100 text-sm rounded-md">
           <thead className="bg-indigo-50">
             <tr>
+              <th>
+                {/* Checkbox Header for Select All can be added here if desired */}
+              </th>
               <th className="py-3 px-4 text-left font-bold">#</th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Created</th>
               <th className="py-3 px-4 text-left font-bold">Days</th>
               <th className="py-3 px-4 text-left font-bold">Meals</th>
-              <th className="py-3 px-4"></th>
+              <th />
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-50">
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-400">
+                <td colSpan={7} className="text-center py-8 text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : mealPlans.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="text-center py-10 text-gray-300 font-semibold"
                 >
                   No meal plans found.
@@ -125,21 +217,34 @@ export default function MealPlansPage() {
             ) : (
               mealPlans.map((plan, idx) => (
                 <tr key={plan.id} className="hover:bg-indigo-50 transition">
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(plan.id)}
+                      onChange={() => toggleSelect(plan.id)}
+                    />
+                  </td>
                   <td className="py-2 px-4">{idx + 1}</td>
                   <td className="py-2 px-4 capitalize">{plan.name}</td>
                   <td className="py-2 px-4">
                     {plan.createdAt?.slice(0, 10) || "-"}
                   </td>
                   <td className="py-2 px-4">
-                    {[...new Set((plan.items || []).map((i) => i.date))].length}
+                    {
+                      [
+                        ...new Set(
+                          plan.items?.map((i) => (i.date.length ? i.date : ""))
+                        ),
+                      ].length
+                    }
                   </td>
                   <td className="py-2 px-4">
                     {plan.items && plan.items.length > 0 ? (
                       <ul className="list-disc pl-3">
                         {plan.items.map((item) =>
                           item.recipe ? (
-                            <li key={item.id || item.date + item.recipe.id}>
-                              {item.date}: {item.recipe.name}
+                            <li key={item.id + "-" + item.date}>
+                              {item.date} {item.recipe.name}
                             </li>
                           ) : null
                         )}

@@ -29,3 +29,13 @@ export async function generateFromRecipes(recipeIds, name, date) {
   });
   return res.data;
 }
+
+// NEW: Generate grocery list from meal plan IDs
+export async function generateFromMealPlans(mealPlanIds, name, date) {
+  const res = await axios.post(API_URL + "/generate/mealplans", {
+    mealPlanIds,
+    name,
+    date,
+  });
+  return res.data;
+}
