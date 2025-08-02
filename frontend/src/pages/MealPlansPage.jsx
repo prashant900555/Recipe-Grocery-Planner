@@ -148,7 +148,7 @@ export default function MealPlansPage() {
         </span>
         <input
           type="text"
-          placeholder="List name"
+          placeholder="Enter grocery list name"
           className="border rounded px-2 py-1 mr-2"
           value={listName}
           onChange={(e) => setListName(e.target.value)}
