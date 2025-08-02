@@ -22,7 +22,7 @@ public class GroceryList {
 
     private String date; // Shopping date, in DD-MM-YYYY format
 
-    private boolean completed = false; // optional: all items purchased
+    private boolean completed; // optional: all items purchased
 
     @ManyToOne
     @JoinColumn(name = "meal_plan_id")

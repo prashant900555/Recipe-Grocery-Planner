@@ -57,6 +57,8 @@ public class GroceryListServiceImpl implements GroceryListService {
                 dbList.setName(incomingList.getName());
                 dbList.setDate(incomingList.getDate());
                 dbList.setMealPlan(incomingList.getMealPlan());
+                dbList.setCompleted(incomingList.isCompleted());
+
 
                 return groceryListRepository.save(dbList);
             }
