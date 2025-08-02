@@ -21,15 +21,6 @@ export async function deleteGroceryList(id) {
   await axios.delete(`${API_URL}/${id}`);
 }
 
-export async function generateFromMealPlan(mealPlanId, name, date) {
-  const res = await axios.post(
-    `${API_URL}/generate/mealplan/${mealPlanId}?name=${encodeURIComponent(
-      name
-    )}&date=${date}`
-  );
-  return res.data;
-}
-
 export async function generateFromRecipes(recipeIds, name, date) {
   const res = await axios.post(`${API_URL}/generaterecipes`, {
     recipeIds,

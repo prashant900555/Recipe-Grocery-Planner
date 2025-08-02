@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getIngredients } from "../services/ingredientService";
 import { getMealPlans } from "../services/mealPlanService";
-import { generateFromMealPlan } from "../services/groceryListService";
 
 // Helper to get today's date string in DD-MM-YYYY
 function todayDDMMYYYY() {
@@ -28,12 +27,12 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
 
   useEffect(() => {
     if (initialData) {
-      setName(initialData.name || "");
+      setName(initialData.name);
       setDate(initialData.date || todayDDMMYYYY());
       setItems(
-        (initialData.entries || []).map((item) => ({
+        initialData.entries?.map((item) => ({
           ...item,
-        }))
+        })) || []
       );
       setSelectedMealPlan(initialData.mealPlan?.id || "");
     } else {
@@ -43,20 +42,6 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
       setDate(todayDDMMYYYY());
     }
   }, [initialData]);
-
-  async function handleGenerateFromMealPlan() {
-    if (!selectedMealPlan) return;
-    try {
-      const gl = await generateFromMealPlan(
-        selectedMealPlan,
-        name || "Auto List",
-        date
-      );
-      setItems(gl.entries || []);
-    } catch {
-      setError("Failed to generate from meal plan.");
-    }
-  }
 
   function handleAddItem() {
     setItems([
@@ -106,11 +91,6 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
   }
 
   function handleSubmit(e) {
-    if (!items.length) {
-      setError("At least one ingredient must be added.");
-      return;
-    }
-
     e.preventDefault();
     if (!items.length) {
       setError("At least one ingredient must be added.");
@@ -123,7 +103,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
     onSubmit({
       ...initialData,
       name: name.trim(),
-      date: date,
+      date,
       mealPlan: selectedMealPlan ? { id: selectedMealPlan } : null,
       entries: items,
     });
@@ -134,6 +114,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
     const [dd, mm, yyyy] = ddmmyyyy.split("-");
     return `${yyyy}-${mm}-${dd}`;
   }
+
   function toDDMMYYYY(iso) {
     // YYYY-MM-DD => DD-MM-YYYY
     const [yyyy, mm, dd] = iso.split("-");
@@ -168,33 +149,6 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
         />
       </div>
       <div>
-        <label className="block mb-1 font-semibold text-blue-700">
-          Generate from Meal Plan
-        </label>
-        <div className="flex gap-3 items-center">
-          <select
-            className="border border-gray-300 rounded px-2 py-1"
-            value={selectedMealPlan}
-            onChange={(e) => setSelectedMealPlan(e.target.value)}
-          >
-            <option value="">Select meal plan</option>
-            {mealPlans.map((plan) => (
-              <option value={plan.id} key={plan.id}>
-                {plan.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800"
-            onClick={handleGenerateFromMealPlan}
-            disabled={!selectedMealPlan}
-          >
-            Generate
-          </button>
-        </div>
-      </div>
-      <div>
         <div className="flex justify-between items-center mb-2">
           <label className="font-semibold text-blue-700">Ingredients</label>
           <button
@@ -202,7 +156,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
             onClick={handleAddItem}
           >
-            + Add Ingredient
+            Add Ingredient
           </button>
         </div>
         <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -229,9 +183,9 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
                     }
                   >
                     <option value="">Select</option>
-                    {ingredients.map((ing) => (
-                      <option key={ing.id} value={ing.id}>
-                        {ing.name}
+                    {ingredients.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.name}
                       </option>
                     ))}
                   </select>
@@ -242,6 +196,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
                     className="border border-gray-300 rounded px-2 py-1 w-20"
                     value={item.unit}
                     disabled
+                    readOnly
                   />
                 </td>
                 <td>
@@ -261,7 +216,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
                   <input
                     type="text"
                     className="border border-gray-300 rounded px-2 py-1"
-                    value={item.note || ""}
+                    value={item.note}
                     onChange={(e) =>
                       handleFieldChange(idx, "note", e.target.value)
                     }
@@ -279,42 +234,38 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
                 <td>
                   <button
                     type="button"
-                    className="px-2 text-red-600"
+                    className="text-red-600 px-2"
                     onClick={() => handleRemove(idx)}
+                    title="Remove"
                   >
-                    ✕
+                    Remove
                   </button>
                 </td>
               </tr>
             ))}
-            {items.length === 0 && (
+            {error && (
               <tr>
-                <td colSpan={6} className="text-gray-400 text-center py-2">
-                  No items. Use Generate or + Add Ingredient.
+                <td colSpan={6} className="text-red-600 text-sm">
+                  {error}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-      {error && (
-        <div className="bg-red-50 border border-red-500 text-red-700 px-3 py-2 rounded">
-          {error}
-        </div>
-      )}
-      <div className="flex gap-4 justify-end mt-2">
-        <button
-          type="submit"
-          className="bg-blue-600 text-white font-semibold px-6 py-2 rounded shadow hover:bg-blue-700"
-        >
-          Save List
-        </button>
+      <div className="flex gap-4 justify-end items-center">
         <button
           type="button"
-          className="border border-gray-400 px-6 py-2 rounded hover:bg-gray-100"
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
           onClick={onCancel}
         >
           Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-green-700 text-white rounded"
+        >
+          Save Grocery List
         </button>
       </div>
     </form>
