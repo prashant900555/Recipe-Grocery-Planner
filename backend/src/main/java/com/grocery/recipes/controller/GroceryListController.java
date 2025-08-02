@@ -59,17 +59,6 @@ public class GroceryListController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/generate/mealplan/{mealPlanId}")
-    public ResponseEntity<GroceryList> generateFromMealPlan(
-            @PathVariable Long mealPlanId,
-            @RequestParam String name,
-            @RequestParam String date) {
-        GroceryList glist = ((GroceryListServiceImpl) groceryListService)
-                .generateFromMealPlan(mealPlanId, name, date);
-        // Do NOT save here! Just return the generated grocery list
-        return new ResponseEntity<>(glist, HttpStatus.OK);
-    }
-
     @PostMapping("/generaterecipes")
     public ResponseEntity<?> generateFromRecipes(@RequestBody Map<String, Object> payload) {
         try {

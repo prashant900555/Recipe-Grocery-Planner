@@ -84,39 +84,6 @@ public class GroceryListServiceImpl implements GroceryListService {
         groceryListRepository.deleteById(id);
     }
 
-    public GroceryList generateFromMealPlan(Long mealPlanId, String listName, String shoppingDate) {
-        MealPlan mealPlan = mealPlanRepository.findById(mealPlanId)
-                .orElseThrow(() -> new IllegalArgumentException("Meal plan not found"));
-
-        Map<String, GroceryListEntry> merged = new LinkedHashMap<>();
-
-        for (MealPlanItem item : mealPlan.getItems()) {
-            if (item.getRecipe() == null) continue;
-            for (RecipeIngredient ri : item.getRecipe().getIngredients()) {
-                String key = ri.getIngredient().getId() + "_" + ri.getIngredient().getUnit();
-                if (merged.containsKey(key)) {
-                    GroceryListEntry entry = merged.get(key);
-                    entry.setQuantity(entry.getQuantity() + ri.getQuantity());
-                } else {
-                    GroceryListEntry entry = new GroceryListEntry();
-                    entry.setIngredientId(ri.getIngredient().getId());
-                    entry.setIngredientName(ri.getIngredient().getName());
-                    entry.setUnit(ri.getIngredient().getUnit());
-                    entry.setQuantity(ri.getQuantity());
-                    entry.setNote("");
-                    entry.setPurchased(false);
-                    merged.put(key, entry);
-                }
-            }
-        }
-        GroceryList glist = new GroceryList();
-        glist.setName(listName);
-        glist.setDate(shoppingDate);
-        glist.setEntries(new ArrayList<>(merged.values()));
-        glist.setMealPlan(mealPlan);
-        return glist;
-    }
-
     @Override
     public GroceryList generateFromRecipes(List<Long> recipeIds, String listName, String shoppingDate) {
         if (recipeIds == null || recipeIds.isEmpty()) {
