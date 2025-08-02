@@ -6,6 +6,7 @@ import {
   deleteGroceryList,
 } from "../services/groceryListService";
 import GroceryListForm from "../components/GroceryListForm";
+import { useNavigate } from "react-router-dom";
 
 export default function GroceryListsPage() {
   const [lists, setLists] = useState([]);
@@ -13,6 +14,7 @@ export default function GroceryListsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editList, setEditList] = useState(null);
   const [error, setError] = useState();
+  const navigate = useNavigate();
 
   const fetchAll = async () => {
     setLoading(true);
@@ -61,14 +63,21 @@ export default function GroceryListsPage() {
     }
   }
 
-  function showPurchasedCount(entries = []) {
-    if (!entries || !entries.length) return "";
-    const done = entries.filter((e) => e.purchased).length;
-    return `${done}/${entries.length}`;
+  function showPurchasedCount(entries) {
+    if (!entries || !entries.length) return "0";
+    const done = entries.filter((e) => e.purchased);
+    return `${done.length} / ${entries.length}`;
   }
 
   return (
     <section className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
+      <button
+        type="button"
+        className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+        onClick={() => navigate("/")}
+      >
+        Back to Home
+      </button>
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
         <h2 className="text-3xl font-bold text-pink-800">Grocery Lists</h2>
         <button
@@ -86,7 +95,6 @@ export default function GroceryListsPage() {
           {error}
         </div>
       )}
-
       {showForm && (
         <div className="mb-10">
           <GroceryListForm
@@ -99,7 +107,6 @@ export default function GroceryListsPage() {
           />
         </div>
       )}
-
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100 text-sm rounded-md">
           <thead className="bg-pink-50">
@@ -107,7 +114,6 @@ export default function GroceryListsPage() {
               <th className="py-3 px-4 text-left font-bold">#</th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Date</th>
-              <th className="py-3 px-4 text-left font-bold">From Meal Plan</th>
               <th className="py-3 px-4 text-left font-bold">Items</th>
               <th className="py-3 px-4 text-left font-bold">Purchased</th>
               <th className="py-3 px-4"></th>
@@ -116,14 +122,14 @@ export default function GroceryListsPage() {
           <tbody className="bg-white divide-y divide-gray-50">
             {loading ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-400">
+                <td colSpan={6} className="text-center py-8 text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : lists.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={6}
                   className="text-center py-10 text-gray-300 font-semibold"
                 >
                   No grocery lists found.
@@ -135,7 +141,6 @@ export default function GroceryListsPage() {
                   <td className="py-2 px-4">{idx + 1}</td>
                   <td className="py-2 px-4">{list.name}</td>
                   <td className="py-2 px-4">{list.date || "-"}</td>
-                  <td className="py-2 px-4">{list.mealPlan?.name || "-"}</td>
                   <td className="py-2 px-4">
                     {list.entries && list.entries.length > 0 ? (
                       <ul className="list-disc pl-4">
@@ -143,7 +148,7 @@ export default function GroceryListsPage() {
                           <li key={e.ingredientId + "-" + i}>
                             {e.quantity} {e.unit} {e.ingredientName}
                             {e.note ? ` (${e.note})` : ""}
-                            {e.purchased ? " ✔️" : ""}
+                            {e.purchased ? "✓" : ""}
                           </li>
                         ))}
                       </ul>

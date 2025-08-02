@@ -19,7 +19,6 @@ export default function RecipesPage() {
   const [listName, setListName] = useState("");
   const [listDate, setListDate] = useState("");
   const [generating, setGenerating] = useState(false);
-
   const navigate = useNavigate();
 
   const fetchAll = async () => {
@@ -36,6 +35,7 @@ export default function RecipesPage() {
 
   useEffect(() => {
     fetchAll();
+    setListDate(todayDDMMYYYY());
   }, []);
 
   async function handleCreate(data) {
@@ -91,22 +91,15 @@ export default function RecipesPage() {
       setGenerating(false);
       navigate("/grocerylists");
     } catch (e) {
-      // Show error in UI, and log all details to the console:
       let message = "Failed to generate grocery list.";
       if (e.response?.data) {
-        if (typeof e.response.data === "string") {
-          message = e.response.data;
-        } else if (e.response.data.message) {
-          message = e.response.data.message;
-        } else {
-          message = JSON.stringify(e.response.data);
-        }
+        if (typeof e.response.data === "string") message = e.response.data;
+        else if (e.response.data.message) message = e.response.data.message;
+        else message = JSON.stringify(e.response.data);
       } else if (e.message) {
         message = e.message;
       }
       setError(message);
-      // Debug log to browser console
-      console.error("Grocery list generation failed:", e, e.response?.data);
       setGenerating(false);
     }
   }
@@ -119,12 +112,15 @@ export default function RecipesPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
-  useEffect(() => {
-    setListDate(todayDDMMYYYY());
-  }, []);
-
   return (
     <section className="max-w-4xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
+      <button
+        type="button"
+        className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+        onClick={() => navigate("/")}
+      >
+        Back to Home
+      </button>
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
         <h2 className="text-3xl font-bold text-blue-800">Recipes</h2>
         <button
@@ -142,10 +138,10 @@ export default function RecipesPage() {
           {error}
         </div>
       )}
-
+      {/* Selection and Generate */}
       <div className="mb-6 border p-4 rounded bg-blue-50">
         <span className="font-semibold mr-3">
-          Select recipes to generate a grocery list:
+          Select recipes to generate a grocery list
         </span>
         <input
           type="text"
@@ -163,7 +159,6 @@ export default function RecipesPage() {
             return `${yyyy}-${mm}-${dd}`;
           })()}
           onChange={(e) => {
-            // Convert YYYY-MM-DD to DD-MM-YYYY
             const [yyyy, mm, dd] = e.target.value.split("-");
             setListDate(`${dd}-${mm}-${yyyy}`);
           }}
@@ -177,7 +172,6 @@ export default function RecipesPage() {
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
       </div>
-
       {showForm && (
         <div className="mb-10">
           <RecipeForm
@@ -220,7 +214,7 @@ export default function RecipesPage() {
             ) : (
               recipes.map((rec, idx) => (
                 <tr key={rec.id} className="hover:bg-blue-50 transition">
-                  <td className="py-2 px-4">
+                  <td>
                     <input
                       type="checkbox"
                       checked={selected.includes(rec.id)}
@@ -234,15 +228,16 @@ export default function RecipesPage() {
                       <ul className="list-disc pl-4">
                         {rec.ingredients.map((ri) =>
                           ri.ingredient ? (
-                            <li key={ri.id || Math.random()}>
+                            <li key={ri.id + Math.random()}>
                               {ri.quantity} {ri.ingredient.unit}{" "}
-                              {ri.ingredient.name} {ri.note ? ri.note : ""}
+                              {ri.ingredient.name}
+                              {ri.note ? ` (${ri.note})` : ""}
                             </li>
                           ) : null
                         )}
                       </ul>
                     ) : (
-                      <span className="text-gray-400-span"></span>
+                      <span className="text-gray-400">-</span>
                     )}
                   </td>
                   <td className="py-2 px-4 flex gap-2">

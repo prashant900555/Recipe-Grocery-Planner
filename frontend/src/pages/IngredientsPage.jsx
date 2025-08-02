@@ -6,19 +6,21 @@ import {
   deleteIngredient,
 } from "../services/ingredientService";
 import IngredientForm from "../components/IngredientForm";
+import { useNavigate } from "react-router-dom";
 
 export default function IngredientsPage() {
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editIngredient, setEditIngredient] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState();
+  const navigate = useNavigate();
 
   async function fetchAll() {
     setLoading(true);
     try {
       setIngredients(await getIngredients());
-      setErrorMsg("");
+      setErrorMsg();
     } catch {
       setErrorMsg("Failed to fetch ingredients.");
     }
@@ -62,6 +64,13 @@ export default function IngredientsPage() {
 
   return (
     <section className="max-w-3xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
+      <button
+        type="button"
+        className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+        onClick={() => navigate("/")}
+      >
+        Back to Home
+      </button>
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
         <h2 className="text-3xl font-bold text-blue-800">Ingredients</h2>
         <button
@@ -71,16 +80,14 @@ export default function IngredientsPage() {
             setEditIngredient(null);
           }}
         >
-          + Add Ingredient
+          Add Ingredient
         </button>
       </div>
-
       {errorMsg && (
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
           {errorMsg}
         </div>
       )}
-
       {showForm && (
         <div className="mb-8">
           <IngredientForm
@@ -93,7 +100,6 @@ export default function IngredientsPage() {
           />
         </div>
       )}
-
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm rounded-md">
           <thead className="bg-gray-100">
