@@ -2,23 +2,21 @@ import React, { useState, useEffect } from "react";
 import { getIngredients } from "../services/ingredientService";
 import { getMealPlans } from "../services/mealPlanService";
 
-// Helper to get today's date string in DD-MM-YYYY
-function todayDDMMYYYY() {
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const yyyy = now.getFullYear();
-  return `${dd}-${mm}-${yyyy}`;
+function today() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")}-${String(
+    d.getMonth() + 1
+  ).padStart(2, "0")}-${d.getFullYear()}`;
 }
 
 export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
   const [name, setName] = useState("");
-  const [date, setDate] = useState(todayDDMMYYYY());
+  const [date, setDate] = useState(today());
   const [mealPlans, setMealPlans] = useState([]);
   const [selectedMealPlan, setSelectedMealPlan] = useState("");
   const [ingredients, setIngredients] = useState([]);
   const [items, setItems] = useState([]);
-  const [error, setError] = useState();
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     getIngredients().then(setIngredients);
@@ -27,23 +25,19 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
 
   useEffect(() => {
     if (initialData) {
-      setName(initialData.name);
-      setDate(initialData.date || todayDDMMYYYY());
-      setItems(
-        initialData.entries?.map((item) => ({
-          ...item,
-        })) || []
-      );
+      setName(initialData.name || "");
+      setDate(initialData.date || today());
+      setItems(initialData.entries?.map((e) => ({ ...e })) || []);
       setSelectedMealPlan(initialData.mealPlan?.id || "");
     } else {
+      setName("");
+      setDate(today());
       setItems([]);
       setSelectedMealPlan("");
-      setName("");
-      setDate(todayDDMMYYYY());
     }
   }, [initialData]);
 
-  function handleAddItem() {
+  function handleAdd() {
     setItems([
       ...items,
       {
@@ -52,15 +46,16 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
         unit: "",
         quantity: 1,
         note: "",
-        purchased: false,
+        // If you want new items to always start as not purchased, add:
+        // purchased: false
       },
     ]);
   }
 
-  function handleIngredientChange(idx, value) {
-    const ing = ingredients.find((i) => String(i.id) === value);
-    setItems((prev) =>
-      prev.map((item, i) =>
+  function handleIngredientChange(idx, val) {
+    const ing = ingredients.find((i) => String(i.id) === val);
+    setItems(
+      items.map((item, i) =>
         i === idx
           ? {
               ...item,
@@ -74,32 +69,37 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
   }
 
   function handleFieldChange(idx, field, value) {
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === idx
-          ? {
-              ...item,
-              [field]: value,
-            }
-          : item
-      )
+    setItems(
+      items.map((item, i) => (i === idx ? { ...item, [field]: value } : item))
     );
   }
 
   function handleRemove(idx) {
-    setItems((prev) => prev.filter((_, i) => i !== idx));
+    setItems(items.filter((_, i) => i !== idx));
   }
 
-  function handleSubmit(e) {
+  function toIso(date) {
+    const [d, m, y] = date.split("-");
+    return `${y}-${m}-${d}`;
+  }
+
+  function toDMY(date) {
+    const [y, m, d] = date.split("-");
+    return `${d}-${m}-${y}`;
+  }
+
+  function handleFormSubmit(e) {
     e.preventDefault();
-    if (!items.length) {
-      setError("At least one ingredient must be added.");
+    if (items.length === 0) {
+      setError("At least one ingredient is required.");
       return;
     }
     if (items.some((item) => !item.ingredientId || !item.quantity)) {
-      setError("All ingredients must be selected and quantities > 0.");
+      setError("Please complete all ingredient fields.");
       return;
     }
+    setError(null);
+    // Keep all original data fields, including purchased if present
     onSubmit({
       ...initialData,
       name: name.trim(),
@@ -109,22 +109,10 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
     });
   }
 
-  function toInputDate(ddmmyyyy) {
-    // DD-MM-YYYY => YYYY-MM-DD
-    const [dd, mm, yyyy] = ddmmyyyy.split("-");
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  function toDDMMYYYY(iso) {
-    // YYYY-MM-DD => DD-MM-YYYY
-    const [yyyy, mm, dd] = iso.split("-");
-    return `${dd}-${mm}-${yyyy}`;
-  }
-
   return (
     <form
       className="bg-blue-50 border border-blue-200 rounded-lg shadow p-6 max-w-2xl mx-auto flex flex-col gap-6"
-      onSubmit={handleSubmit}
+      onSubmit={handleFormSubmit}
     >
       <div>
         <label className="block mb-1 font-semibold text-blue-700">
@@ -143,9 +131,9 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
         <input
           type="date"
           className="border border-blue-300 rounded px-3 py-2"
-          value={toInputDate(date)}
+          value={toIso(date)}
           required
-          onChange={(e) => setDate(toDDMMYYYY(e.target.value))}
+          onChange={(e) => setDate(toDMY(e.target.value))}
         />
       </div>
       <div>
@@ -154,7 +142,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
           <button
             type="button"
             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-            onClick={handleAddItem}
+            onClick={handleAdd}
           >
             Add Ingredient
           </button>
@@ -166,7 +154,6 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
               <th className="px-2 py-1">Unit</th>
               <th className="px-2 py-1">Quantity</th>
               <th className="px-2 py-1">Note</th>
-              <th className="px-2 py-1">Purchased</th>
               <th />
             </tr>
           </thead>
@@ -183,9 +170,9 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
                     }
                   >
                     <option value="">Select</option>
-                    {ingredients.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.name}
+                    {ingredients.map((ing) => (
+                      <option key={ing.id} value={ing.id}>
+                        {ing.name}
                       </option>
                     ))}
                   </select>
@@ -223,15 +210,6 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
                   />
                 </td>
                 <td>
-                  <input
-                    type="checkbox"
-                    checked={item.purchased || false}
-                    onChange={(e) =>
-                      handleFieldChange(idx, "purchased", e.target.checked)
-                    }
-                  />
-                </td>
-                <td>
                   <button
                     type="button"
                     className="text-red-600 px-2"
@@ -245,7 +223,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
             ))}
             {error && (
               <tr>
-                <td colSpan={6} className="text-red-600 text-sm">
+                <td colSpan={5} className="text-red-600 text-sm">
                   {error}
                 </td>
               </tr>

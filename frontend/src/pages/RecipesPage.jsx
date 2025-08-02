@@ -16,7 +16,6 @@ export default function RecipesPage() {
   const [editRecipe, setEditRecipe] = useState(null);
   const [error, setError] = useState();
   const [selected, setSelected] = useState([]);
-  const [listName, setListName] = useState("");
   const [listDate, setListDate] = useState("");
   const [generating, setGenerating] = useState(false);
   const navigate = useNavigate();
@@ -76,18 +75,22 @@ export default function RecipesPage() {
   }
 
   async function handleGenerateList() {
-    if (!listName.trim()) {
-      setError("Please enter a name for the grocery list.");
-      return;
-    }
     if (!listDate.trim()) {
       setError("Please enter a date for the grocery list.");
+      return;
+    }
+    if (!selected.length) {
+      setError("Select at least one recipe to generate the grocery list.");
       return;
     }
     setGenerating(true);
     setError();
     try {
-      await generateFromRecipes(selected, listName.trim(), listDate);
+      // Use dynamic name: Recipe_{date}_{id}
+      const dateStr = listDate; // already in DD-MM-YYYY
+      const firstId = selected[0];
+      const dynamicName = `Recipe_${dateStr}_${firstId}`;
+      await generateFromRecipes(selected, dynamicName, listDate);
       setGenerating(false);
       navigate("/grocerylists");
     } catch (e) {
@@ -139,18 +142,10 @@ export default function RecipesPage() {
         </div>
       )}
       {/* Selection and Generate */}
-      <div className="mb-6 border p-4 rounded bg-blue-50">
-        <span className="font-semibold mr-3">
+      <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
+        <span className="font-semibold mr-2">
           Select recipes to generate a grocery list
         </span>
-        <input
-          type="text"
-          placeholder="Enter grocery list name"
-          className="border rounded px-2 py-1 mr-2"
-          value={listName}
-          onChange={(e) => setListName(e.target.value)}
-          required
-        />
         <input
           type="date"
           className="border rounded px-2 py-1 mr-2"
