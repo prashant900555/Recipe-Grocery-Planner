@@ -5,10 +5,7 @@ import {
   updateMealPlan,
   deleteMealPlan,
 } from "../services/mealPlanService";
-import {
-  generateFromMealPlans,
-  getActiveItems,
-} from "../services/groceryListService";
+import { generateFromMealPlans } from "../services/groceryListService";
 import MealPlanForm from "../components/MealPlanForm";
 import { useNavigate } from "react-router-dom";
 
@@ -20,7 +17,6 @@ export default function MealPlansPage() {
   const [error, setError] = useState();
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
-  const [hasActiveGroceryList, setHasActiveGroceryList] = useState(false);
 
   const navigate = useNavigate();
 
@@ -37,19 +33,8 @@ export default function MealPlansPage() {
     }
   };
 
-  // Check for any active grocery list (completed === false)
-  const checkActiveGroceryList = async () => {
-    try {
-      const lists = await getActiveItems();
-      setHasActiveGroceryList(lists.some((l) => !l.completed));
-    } catch {
-      setHasActiveGroceryList(false);
-    }
-  };
-
   useEffect(() => {
     fetchAll();
-    checkActiveGroceryList();
     // eslint-disable-next-line
   }, []);
 
@@ -134,12 +119,6 @@ export default function MealPlansPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
-  // Re-check for active grocery list whenever selection or form opens
-  useEffect(() => {
-    checkActiveGroceryList();
-    // eslint-disable-next-line
-  }, [selected, showForm]);
-
   return (
     <section className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
       <button
@@ -176,16 +155,10 @@ export default function MealPlansPage() {
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
           onClick={handleGenerate}
-          disabled={generating || selected.length === 0 || hasActiveGroceryList}
+          disabled={generating || selected.length === 0}
         >
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
-        {hasActiveGroceryList && (
-          <span className="ml-2 px-2 py-1 text-sm bg-red-100 text-red-700 rounded">
-            You must first mark your current active grocery list as purchased
-            before creating another.
-          </span>
-        )}
       </div>
 
       {showForm && (

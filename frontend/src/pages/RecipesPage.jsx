@@ -6,10 +6,7 @@ import {
   deleteRecipe,
   updateRecipeServings, // NEW import
 } from "../services/recipeService";
-import {
-  generateFromRecipes,
-  getActiveItems,
-} from "../services/groceryListService";
+import { generateFromRecipes } from "../services/groceryListService";
 import RecipeForm from "../components/RecipeForm";
 import { useNavigate } from "react-router-dom";
 
@@ -32,31 +29,17 @@ const convertUnits = (quantity, unit) => {
   if (isNaN(num) || num === 0) return `${quantity} ${unit}`;
 
   // Weight conversions
-  if (unit === "g" && num >= 1000) {
-    return `${(num / 1000).toFixed(2)} kg`;
-  }
-  if (unit === "kg" && num < 1) {
-    return `${(num * 1000).toFixed(2)} g`;
-  }
+  if (unit === "g" && num >= 1000) return `${(num / 1000).toFixed(2)} kg`;
+  if (unit === "kg" && num < 1) return `${(num * 1000).toFixed(2)} g`;
 
   // Volume conversions
-  if (unit === "ml" && num >= 1000) {
-    return `${(num / 1000).toFixed(2)} l`;
-  }
-  if (unit === "l" && num < 1) {
-    return `${(num * 1000).toFixed(2)} ml`;
-  }
+  if (unit === "ml" && num >= 1000) return `${(num / 1000).toFixed(2)} l`;
+  if (unit === "l" && num < 1) return `${(num * 1000).toFixed(2)} ml`;
 
   // Other conversions
-  if (unit === "oz" && num >= 16) {
-    return `${(num / 16).toFixed(2)} lb`;
-  }
-  if (unit === "tsp" && num >= 3) {
-    return `${(num / 3).toFixed(2)} tbsp`;
-  }
-  if (unit === "tbsp" && num >= 16) {
-    return `${(num / 16).toFixed(2)} cup`;
-  }
+  if (unit === "oz" && num >= 16) return `${(num / 16).toFixed(2)} lb`;
+  if (unit === "tsp" && num >= 3) return `${(num / 3).toFixed(2)} tbsp`;
+  if (unit === "tbsp" && num >= 16) return `${(num / 16).toFixed(2)} cup`;
 
   return `${num.toFixed(2)} ${unit}`;
 };
@@ -69,7 +52,6 @@ export default function RecipesPage() {
   const [error, setError] = useState();
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
-  const [hasActiveGroceryList, setHasActiveGroceryList] = useState(false);
   const [servingsUpdateQueue, setServingsUpdateQueue] = useState({}); // Track pending updates
   const navigate = useNavigate();
 
@@ -83,16 +65,6 @@ export default function RecipesPage() {
       setError("Failed to fetch recipes.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Check for any active (not purchased) grocery list
-  const checkActiveGroceryList = async () => {
-    try {
-      const lists = await getActiveItems();
-      setHasActiveGroceryList(lists.some((l) => !l.completed));
-    } catch {
-      setHasActiveGroceryList(false);
     }
   };
 
@@ -132,7 +104,6 @@ export default function RecipesPage() {
 
   useEffect(() => {
     fetchAllRecipes();
-    checkActiveGroceryList();
   }, []);
 
   async function handleCreate(data) {
@@ -222,11 +193,6 @@ export default function RecipesPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
-  // Re-check for an active grocery list whenever selection or form opens
-  useEffect(() => {
-    checkActiveGroceryList();
-  }, [selected, showForm]);
-
   return (
     <section className="max-w-6xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
       <button
@@ -261,16 +227,10 @@ export default function RecipesPage() {
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
           onClick={handleGenerateList}
-          disabled={generating || selected.length === 0 || hasActiveGroceryList}
+          disabled={generating || selected.length === 0}
         >
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
-        {hasActiveGroceryList && (
-          <span className="ml-2 px-2 py-1 text-sm bg-red-100 text-red-700 rounded">
-            You must first mark your current active grocery list as purchased
-            before creating another.
-          </span>
-        )}
       </div>
       {showForm && (
         <div className="mb-10">
