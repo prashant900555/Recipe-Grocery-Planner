@@ -12,9 +12,12 @@ import {
 } from "../services/groceryListService";
 import { useNavigate } from "react-router-dom";
 
-function formatDate(date) {
-  if (!date) return "";
-  return date;
+// Extract DD-MM-YYYY pattern from a string (e.g., awd_03-08-2025_List → 03-08-2025)
+function extractDate(str) {
+  if (!str) return "";
+  // Match DD-MM-YYYY (not strict for valid ranges, just the pattern)
+  const match = str.match(/\d{2}-\d{2}-\d{4}/);
+  return match ? match[0] : str;
 }
 
 const initialNewItem = {
@@ -282,9 +285,9 @@ export default function GroceryListsPage() {
                     }
                   />
                 ) : purchased ? (
-                  formatDate(item.datePurchased)
+                  extractDate(item.datePurchased)
                 ) : (
-                  formatDate(item.dateAdded)
+                  extractDate(item.dateAdded)
                 )}
               </td>
               <td className="flex gap-1">
