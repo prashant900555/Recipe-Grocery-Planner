@@ -23,7 +23,4 @@ public class Ingredient {
     @NotBlank(message = "Ingredient name is required")
     private String name;
 
-    @NotNull(message = "Unit is required")
-    // e.g., g, ml, pcs, ...
-    private String unit;
 }

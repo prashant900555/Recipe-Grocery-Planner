@@ -98,7 +98,7 @@ public class GroceryListServiceImpl implements GroceryListService {
                     .orElseThrow(() -> new IllegalArgumentException("Recipe not found: " + recipeId));
             for (RecipeIngredient ri : recipe.getIngredients()) {
                 if (ri.getIngredient() == null) continue;
-                String key = ri.getIngredient().getId() + "_" + ri.getIngredient().getUnit();
+                String key = ri.getIngredient().getId() + "_" + ri.getUnit();
                 if (merged.containsKey(key)) {
                     GroceryListEntry entry = merged.get(key);
                     entry.setQuantity(entry.getQuantity() + ri.getQuantity());
@@ -106,7 +106,7 @@ public class GroceryListServiceImpl implements GroceryListService {
                     GroceryListEntry entry = new GroceryListEntry();
                     entry.setIngredientId(ri.getIngredient().getId());
                     entry.setIngredientName(ri.getIngredient().getName());
-                    entry.setUnit(ri.getIngredient().getUnit());
+                    entry.setUnit(ri.getUnit());
                     entry.setQuantity(ri.getQuantity());
                     entry.setNote(ri.getNote() == null ? "" : ri.getNote());
                     entry.setPurchased(false);
@@ -140,7 +140,7 @@ public class GroceryListServiceImpl implements GroceryListService {
                 if (item.getRecipe() == null) continue;
                 for (RecipeIngredient ri : item.getRecipe().getIngredients()) {
                     if (ri.getIngredient() == null) continue;
-                    String key = ri.getIngredient().getId() + ri.getIngredient().getUnit();
+                    String key = ri.getIngredient().getId() + ri.getUnit();
                     if (merged.containsKey(key)) {
                         GroceryListEntry entry = merged.get(key);
                         entry.setQuantity(entry.getQuantity() + ri.getQuantity());
@@ -148,7 +148,7 @@ public class GroceryListServiceImpl implements GroceryListService {
                         GroceryListEntry entry = new GroceryListEntry();
                         entry.setIngredientId(ri.getIngredient().getId());
                         entry.setIngredientName(ri.getIngredient().getName());
-                        entry.setUnit(ri.getIngredient().getUnit());
+                        entry.setUnit(ri.getUnit());
                         entry.setQuantity(ri.getQuantity());
                         entry.setNote(ri.getNote() == null ? "" : ri.getNote());
                         entry.setPurchased(false);
