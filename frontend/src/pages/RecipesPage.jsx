@@ -12,6 +12,49 @@ import {
 import RecipeForm from "../components/RecipeForm";
 import { useNavigate } from "react-router-dom";
 
+// Unit conversion utility functions
+const convertUnits = (quantity, unit) => {
+  const num = parseFloat(quantity);
+  if (isNaN(num) || num === 0) return `${quantity} ${unit}`;
+
+  // Weight conversions
+  if (unit === "g" && num >= 1000) {
+    return `${(num / 1000).toFixed(2)} kg`;
+  }
+  if (unit === "kg" && num < 1) {
+    return `${(num * 1000).toFixed(2)} g`;
+  }
+
+  // Volume conversions
+  if (unit === "ml" && num >= 1000) {
+    return `${(num / 1000).toFixed(2)} l`;
+  }
+  if (unit === "l" && num < 1) {
+    return `${(num * 1000).toFixed(2)} ml`;
+  }
+
+  // Ounce conversions
+  if (unit === "oz" && num >= 16) {
+    return `${(num / 16).toFixed(2)} lb`;
+  }
+
+  // Tablespoon/teaspoon conversions
+  if (unit === "tsp" && num >= 3) {
+    return `${(num / 3).toFixed(2)} tbsp`;
+  }
+  if (unit === "tbsp" && num >= 16) {
+    return `${(num / 16).toFixed(2)} cup`;
+  }
+
+  return `${num.toFixed(2)} ${unit}`;
+};
+
+const scaleQuantity = (originalQuantity, originalServings, newServings) => {
+  if (!originalQuantity || !originalServings || !newServings)
+    return originalQuantity;
+  return (parseFloat(originalQuantity) * newServings) / originalServings;
+};
+
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,12 +64,20 @@ export default function RecipesPage() {
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [hasActiveGroceryList, setHasActiveGroceryList] = useState(false);
+  const [servingsAdjustments, setServingsAdjustments] = useState({});
   const navigate = useNavigate();
 
   const fetchAllRecipes = async () => {
     setLoading(true);
     try {
-      setRecipes(await getRecipes());
+      const fetchedRecipes = await getRecipes();
+      setRecipes(fetchedRecipes);
+      // Initialize servings adjustments with original servings from recipes
+      const initialAdjustments = {};
+      fetchedRecipes.forEach((recipe) => {
+        initialAdjustments[recipe.id] = recipe.servings || 1;
+      });
+      setServingsAdjustments(initialAdjustments);
       setError();
     } catch {
       setError("Failed to fetch recipes.");
@@ -48,7 +99,6 @@ export default function RecipesPage() {
   useEffect(() => {
     fetchAllRecipes();
     checkActiveGroceryList();
-    // eslint-disable-next-line
   }, []);
 
   async function handleCreate(data) {
@@ -86,6 +136,18 @@ export default function RecipesPage() {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+  }
+
+  function handleServingsChange(recipeId, newServings) {
+    const parsedServings = parseInt(newServings) || 1;
+    setServingsAdjustments((prev) => ({
+      ...prev,
+      [recipeId]: parsedServings,
+    }));
+  }
+
+  function getCurrentServings(recipe) {
+    return servingsAdjustments[recipe.id] || recipe.servings || 1;
   }
 
   async function handleGenerateList() {
@@ -128,7 +190,6 @@ export default function RecipesPage() {
   // Re-check for an active grocery list whenever selection or form opens
   useEffect(() => {
     checkActiveGroceryList();
-    // eslint-disable-next-line
   }, [selected, showForm]);
 
   return (
@@ -195,6 +256,7 @@ export default function RecipesPage() {
               <th className="py-3 px-4 text-left font-bold">Select</th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Description</th>
+              <th className="py-3 px-4 text-left font-bold">Servings</th>
               <th className="py-3 px-4 text-left font-bold">Ingredients</th>
               <th className="py-3 px-4 text-left font-bold">Actions</th>
             </tr>
@@ -202,98 +264,144 @@ export default function RecipesPage() {
           <tbody className="bg-white divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={5} className="text-center py-8 text-gray-400">
+                <td colSpan={6} className="text-center py-8 text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : recipes.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center py-10 text-gray-300 font-semibold"
                 >
                   No recipes found.
                 </td>
               </tr>
             ) : (
-              recipes.map((rec, idx) => (
-                <tr key={rec.id} className="hover:bg-blue-50 transition">
-                  <td className="py-2 px-4">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(rec.id)}
-                      onChange={() => toggleSelect(rec.id)}
-                      className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                  </td>
-                  <td className="py-2 px-4 capitalize font-medium">
-                    {rec.name}
-                  </td>
-                  <td className="py-2 px-4">{rec.description}</td>
-                  <td className="py-2 px-4">
-                    {rec.ingredients && rec.ingredients.length > 0 ? (
-                      <div className="space-y-2">
-                        <table className="min-w-full text-xs border border-gray-200 rounded">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-2 py-1 text-left font-semibold">
-                                Ingredient
-                              </th>
-                              <th className="px-2 py-1 text-left font-semibold">
-                                Qty
-                              </th>
-                              <th className="px-2 py-1 text-left font-semibold">
-                                Unit
-                              </th>
-                              <th className="px-2 py-1 text-left font-semibold">
-                                Note
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rec.ingredients.map((ri) =>
-                              ri.ingredient ? (
-                                <tr
-                                  key={ri.id + Math.random()}
-                                  className="border-t border-gray-100"
-                                >
-                                  <td className="px-2 py-1 font-medium">
-                                    {ri.ingredient.name}
-                                  </td>
-                                  <td className="px-2 py-1">{ri.quantity}</td>
-                                  <td className="px-2 py-1">{ri.unit}</td>
-                                  <td className="px-2 py-1 text-gray-600">
-                                    {ri.note ? `(${ri.note})` : "-"}
-                                  </td>
-                                </tr>
-                              ) : null
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">No ingredients</span>
-                    )}
-                  </td>
-                  <td className="py-2 px-4 flex gap-2">
-                    <button
-                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                      onClick={() => {
-                        setEditRecipe(rec);
-                        setShowForm(true);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-700"
-                      onClick={() => handleDelete(rec.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
+              recipes.map((rec, idx) => {
+                const currentServings = getCurrentServings(rec);
+                const originalServings = rec.servings || 1;
+
+                return (
+                  <tr key={rec.id} className="hover:bg-blue-50 transition">
+                    <td className="py-2 px-4">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(rec.id)}
+                        onChange={() => toggleSelect(rec.id)}
+                        className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </td>
+                    <td className="py-2 px-4 capitalize font-medium">
+                      {rec.name}
+                    </td>
+                    <td className="py-2 px-4">{rec.description}</td>
+                    <td className="py-2 px-4">
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        className="border border-gray-300 rounded px-2 py-1 w-16 text-center"
+                        value={currentServings}
+                        onChange={(e) =>
+                          handleServingsChange(rec.id, e.target.value)
+                        }
+                      />
+                    </td>
+                    <td className="py-2 px-4">
+                      {rec.ingredients && rec.ingredients.length > 0 ? (
+                        <div className="space-y-2">
+                          <table className="min-w-full text-xs border border-gray-200 rounded">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-2 py-1 text-left font-semibold">
+                                  Ingredient
+                                </th>
+                                <th className="px-2 py-1 text-left font-semibold">
+                                  Qty
+                                </th>
+                                <th className="px-2 py-1 text-left font-semibold">
+                                  Unit
+                                </th>
+                                <th className="px-2 py-1 text-left font-semibold">
+                                  Note
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rec.ingredients.map((ri) =>
+                                ri.ingredient ? (
+                                  <tr
+                                    key={ri.id + Math.random()}
+                                    className="border-t border-gray-100"
+                                  >
+                                    <td className="px-2 py-1 font-medium">
+                                      {ri.ingredient.name}
+                                    </td>
+                                    <td className="px-2 py-1">
+                                      {(() => {
+                                        const scaledQty = scaleQuantity(
+                                          ri.quantity,
+                                          originalServings,
+                                          currentServings
+                                        );
+                                        const converted = convertUnits(
+                                          scaledQty,
+                                          ri.unit
+                                        );
+                                        return converted.split(" ")[0];
+                                      })()}
+                                    </td>
+                                    <td className="px-2 py-1">
+                                      {(() => {
+                                        const scaledQty = scaleQuantity(
+                                          ri.quantity,
+                                          originalServings,
+                                          currentServings
+                                        );
+                                        const converted = convertUnits(
+                                          scaledQty,
+                                          ri.unit
+                                        );
+                                        return converted
+                                          .split(" ")
+                                          .slice(1)
+                                          .join(" ");
+                                      })()}
+                                    </td>
+                                    <td className="px-2 py-1 text-gray-600">
+                                      {ri.note ? `(${ri.note})` : "-"}
+                                    </td>
+                                  </tr>
+                                ) : null
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">No ingredients</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-4 flex gap-2">
+                      <button
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        onClick={() => {
+                          setEditRecipe(rec);
+                          setShowForm(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-700"
+                        onClick={() => handleDelete(rec.id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

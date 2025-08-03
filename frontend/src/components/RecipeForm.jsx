@@ -25,7 +25,6 @@ const UNIT_OPTIONS = [
   "oz",
 ];
 
-// Memoized AutocompleteInput component to prevent unnecessary re-renders
 const AutocompleteInput = memo(
   ({
     row,
@@ -40,7 +39,6 @@ const AutocompleteInput = memo(
     const inputRef = useRef();
     const [cursorPosition, setCursorPosition] = useState(0);
 
-    // Preserve cursor position
     useLayoutEffect(() => {
       if (inputRef.current && document.activeElement === inputRef.current) {
         inputRef.current.setSelectionRange(cursorPosition, cursorPosition);
@@ -164,6 +162,7 @@ const AutocompleteInput = memo(
 export default function RecipeForm({ initialData, onSubmit, onCancel }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [servings, setServings] = useState("");
   const [ingredients, setIngredients] = useState([]);
   const [allIngredients, setAllIngredients] = useState([]);
   const [error, setError] = useState();
@@ -189,6 +188,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     if (initialData) {
       setName(initialData.name || "");
       setDescription(initialData.description || "");
+      setServings(String(initialData.servings || ""));
       setIngredients(
         (initialData.ingredients || []).map((ri) => ({
           ingredientId: ri.ingredient ? ri.ingredient.id : "",
@@ -203,6 +203,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     } else {
       setName("");
       setDescription("");
+      setServings("");
       setIngredients([]);
     }
     setError();
@@ -287,6 +288,11 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       setError("Recipe name is required.");
       return;
     }
+    const servingsValue = parseInt(servings) || 0;
+    if (servingsValue < 1 || servingsValue > 100) {
+      setError("Servings must be between 1 and 100.");
+      return;
+    }
     if (
       ingredients.length === 0 ||
       ingredients.some(
@@ -309,6 +315,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       ...initialData,
       name: name.trim(),
       description: description.trim(),
+      servings: servingsValue,
       ingredients: ingredients.map((row) => ({
         ingredient: allIngredients.find(
           (a) => String(a.id) === String(row.ingredientId)
@@ -347,6 +354,20 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={2}
+        />
+      </div>
+      <div>
+        <label className="block mb-1 font-semibold text-blue-700">
+          Servings
+        </label>
+        <input
+          type="number"
+          min="1"
+          max="100"
+          className="border border-blue-300 rounded px-3 py-2 w-24"
+          value={servings}
+          required
+          onChange={(e) => setServings(e.target.value)}
         />
       </div>
       <div>
