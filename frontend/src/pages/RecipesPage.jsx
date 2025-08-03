@@ -132,7 +132,7 @@ export default function RecipesPage() {
   }, [selected, showForm]);
 
   return (
-    <section className="max-w-4xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
+    <section className="max-w-6xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
       <button
         type="button"
         className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
@@ -192,11 +192,11 @@ export default function RecipesPage() {
         <table className="min-w-full divide-y divide-gray-200 text-sm rounded-md">
           <thead className="bg-gray-100">
             <tr>
-              <th></th>
+              <th className="py-3 px-4 text-left font-bold">Select</th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Description</th>
               <th className="py-3 px-4 text-left font-bold">Ingredients</th>
-              <th></th>
+              <th className="py-3 px-4 text-left font-bold">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
@@ -218,30 +218,61 @@ export default function RecipesPage() {
             ) : (
               recipes.map((rec, idx) => (
                 <tr key={rec.id} className="hover:bg-blue-50 transition">
-                  <td>
+                  <td className="py-2 px-4">
                     <input
                       type="checkbox"
                       checked={selected.includes(rec.id)}
                       onChange={() => toggleSelect(rec.id)}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </td>
-                  <td className="py-2 px-4 capitalize">{rec.name}</td>
+                  <td className="py-2 px-4 capitalize font-medium">
+                    {rec.name}
+                  </td>
                   <td className="py-2 px-4">{rec.description}</td>
                   <td className="py-2 px-4">
                     {rec.ingredients && rec.ingredients.length > 0 ? (
-                      <ul className="list-disc pl-4">
-                        {rec.ingredients.map((ri) =>
-                          ri.ingredient ? (
-                            <li key={ri.id + Math.random()}>
-                              {ri.quantity} {ri.ingredient.unit}{" "}
-                              {ri.ingredient.name}
-                              {ri.note ? ` (${ri.note})` : ""}
-                            </li>
-                          ) : null
-                        )}
-                      </ul>
+                      <div className="space-y-2">
+                        <table className="min-w-full text-xs border border-gray-200 rounded">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-2 py-1 text-left font-semibold">
+                                Ingredient
+                              </th>
+                              <th className="px-2 py-1 text-left font-semibold">
+                                Qty
+                              </th>
+                              <th className="px-2 py-1 text-left font-semibold">
+                                Unit
+                              </th>
+                              <th className="px-2 py-1 text-left font-semibold">
+                                Note
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rec.ingredients.map((ri) =>
+                              ri.ingredient ? (
+                                <tr
+                                  key={ri.id + Math.random()}
+                                  className="border-t border-gray-100"
+                                >
+                                  <td className="px-2 py-1 font-medium">
+                                    {ri.ingredient.name}
+                                  </td>
+                                  <td className="px-2 py-1">{ri.quantity}</td>
+                                  <td className="px-2 py-1">{ri.unit}</td>
+                                  <td className="px-2 py-1 text-gray-600">
+                                    {ri.note ? `(${ri.note})` : "-"}
+                                  </td>
+                                </tr>
+                              ) : null
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-gray-400">No ingredients</span>
                     )}
                   </td>
                   <td className="py-2 px-4 flex gap-2">
