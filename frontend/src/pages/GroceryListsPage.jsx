@@ -17,6 +17,7 @@ export default function GroceryListsPage() {
   const [error, setError] = useState();
   const [showPurchased, setShowPurchased] = useState(false);
   const [processingId, setProcessingId] = useState(null);
+  const [pendingNewList, setPendingNewList] = useState(false);
   const navigate = useNavigate();
 
   const fetchAll = async () => {
@@ -36,13 +37,19 @@ export default function GroceryListsPage() {
   }, []);
 
   function filteredLists() {
-    // By default, show only not completed; in Purchased view, show only completed
     return lists.filter((list) => !!list.completed === showPurchased);
   }
 
-  // Only show Add button if there are no active lists (and not in Purchased view)
   const canAddNew =
     !showPurchased && lists.filter((l) => !l.completed).length === 0;
+
+  function todayDDMMYYYY() {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  }
 
   async function markListPurchased(id) {
     setProcessingId(id);
@@ -68,17 +75,37 @@ export default function GroceryListsPage() {
     }
   }
 
+  // Add: No user-provided name or date
   async function handleCreate(data) {
     try {
-      await createGroceryList(data);
+      setPendingNewList(true);
+      const dateStr = todayDDMMYYYY();
+      // Exclude 'name' and 'date' from newData; they'll be set after initial create
+      const { name, date, ...newData } = data;
+      // Create new list, backend gets placeholder date and name
+      const created = await createGroceryList({
+        ...newData,
+        name: "",
+        date: "",
+      });
+      const dynamicName = `GroceryList_${dateStr}_${created.id}`;
+      // Patch with dynamic name and today's date
+      await updateGroceryList(created.id, {
+        ...created,
+        name: dynamicName,
+        date: dateStr,
+      });
       setShowForm(false);
+      setPendingNewList(false);
       fetchAll();
     } catch {
       setError("Failed to create grocery list.");
+      setPendingNewList(false);
     }
   }
 
   async function handleUpdate(data) {
+    // Do not allow editing name or date
     try {
       await updateGroceryList(data.id, data);
       setShowForm(false);
@@ -151,17 +178,17 @@ export default function GroceryListsPage() {
           <button
             className={
               "bg-green-700 text-white px-4 py-2 rounded-lg shadow transition " +
-              (canAddNew
+              (canAddNew && !pendingNewList
                 ? "hover:bg-green-800 cursor-pointer"
                 : "bg-opacity-50 opacity-60 cursor-not-allowed")
             }
             onClick={() => {
-              if (canAddNew) {
+              if (canAddNew && !pendingNewList) {
                 setShowForm(true);
                 setEditList(null);
               }
             }}
-            disabled={!canAddNew}
+            disabled={!canAddNew || pendingNewList}
             title={
               canAddNew
                 ? ""
@@ -188,6 +215,8 @@ export default function GroceryListsPage() {
               setShowForm(false);
               setEditList(null);
             }}
+            hideNameField={true}
+            hideDateField={true}
           />
         </div>
       )}

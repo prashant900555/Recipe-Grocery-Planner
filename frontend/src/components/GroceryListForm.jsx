@@ -9,7 +9,13 @@ function today() {
   ).padStart(2, "0")}-${d.getFullYear()}`;
 }
 
-export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
+export default function GroceryListForm({
+  onSubmit,
+  onCancel,
+  initialData,
+  hideNameField = false,
+  hideDateField = false,
+}) {
   const [name, setName] = useState("");
   const [date, setDate] = useState(today());
   const [mealPlans, setMealPlans] = useState([]);
@@ -40,15 +46,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
   function handleAdd() {
     setItems([
       ...items,
-      {
-        ingredientId: "",
-        ingredientName: "",
-        unit: "",
-        quantity: 1,
-        note: "",
-        // If you want new items to always start as not purchased, add:
-        // purchased: false
-      },
+      { ingredientId: "", ingredientName: "", unit: "", quantity: 1, note: "" },
     ]);
   }
 
@@ -99,11 +97,12 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
       return;
     }
     setError(null);
-    // Keep all original data fields, including purchased if present
+
+    // For creation, pass blank name and date—they'll be set dynamically
     onSubmit({
       ...initialData,
-      name: name.trim(),
-      date,
+      name: hideNameField ? "" : name,
+      date: hideDateField ? "" : date,
       mealPlan: selectedMealPlan ? { id: selectedMealPlan } : null,
       entries: items,
     });
@@ -114,28 +113,35 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
       className="bg-blue-50 border border-blue-200 rounded-lg shadow p-6 max-w-2xl mx-auto flex flex-col gap-6"
       onSubmit={handleFormSubmit}
     >
-      <div>
-        <label className="block mb-1 font-semibold text-blue-700">
-          List Name
-        </label>
-        <input
-          type="text"
-          className="w-full border border-blue-300 rounded px-3 py-2"
-          value={name}
-          required
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-      <div>
-        <label className="block mb-1 font-semibold text-blue-700">Date</label>
-        <input
-          type="date"
-          className="border border-blue-300 rounded px-3 py-2"
-          value={toIso(date)}
-          required
-          onChange={(e) => setDate(toDMY(e.target.value))}
-        />
-      </div>
+      {/* Hide List Name for add, show for edit if needed */}
+      {!hideNameField && (
+        <div>
+          <label className="block mb-1 font-semibold text-blue-700">
+            List Name
+          </label>
+          <input
+            type="text"
+            className="w-full border border-blue-300 rounded px-3 py-2"
+            value={name}
+            required
+            onChange={(e) => setName(e.target.value)}
+            disabled={!!initialData && initialData.id}
+          />
+        </div>
+      )}
+      {/* Hide Date for add, show for edit if needed */}
+      {!hideDateField && (
+        <div>
+          <label className="block mb-1 font-semibold text-blue-700">Date</label>
+          <input
+            type="date"
+            className="border border-blue-300 rounded px-3 py-2"
+            value={toIso(date)}
+            required
+            onChange={(e) => setDate(toDMY(e.target.value))}
+          />
+        </div>
+      )}
       <div>
         <div className="flex justify-between items-center mb-2">
           <label className="font-semibold text-blue-700">Ingredients</label>
@@ -242,6 +248,7 @@ export default function GroceryListForm({ onSubmit, onCancel, initialData }) {
         <button
           type="submit"
           className="px-4 py-2 bg-green-700 text-white rounded"
+          disabled={hideNameField && !name}
         >
           Save Grocery List
         </button>
