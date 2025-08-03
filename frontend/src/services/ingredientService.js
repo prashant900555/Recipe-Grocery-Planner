@@ -7,6 +7,11 @@ export async function getIngredients() {
   return res.data;
 }
 
+export async function getAllIngredients() {
+  const res = await axios.get("http://localhost:8080/api/ingredients");
+  return res.data; // [{id, name, ...}]
+}
+
 export async function getIngredient(id) {
   const res = await axios.get(`${API_URL}/${id}`);
   return res.data;

@@ -19,10 +19,15 @@ const UNIT_OPTIONS = [
   "cup",
   "tbsp",
   "tsp",
-  "piece",
+  "pcs",
   "slice",
   "can",
   "oz",
+  "lb",
+  "pinch",
+  "dash",
+  "pack",
+  "box",
 ];
 
 const AutocompleteInput = memo(

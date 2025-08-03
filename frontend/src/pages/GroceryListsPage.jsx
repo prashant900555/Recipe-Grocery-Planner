@@ -7,23 +7,56 @@ import {
   deleteItem,
   markPurchased,
   undoPurchased,
-  generateFromRecipes,
-  generateFromMealPlans,
 } from "../services/groceryListService";
+import { getAllIngredients } from "../services/ingredientService";
 import { useNavigate } from "react-router-dom";
 
-// Extract DD-MM-YYYY pattern from a string (e.g., awd_03-08-2025_List → 03-08-2025)
 function extractDate(str) {
   if (!str) return "";
-  // Match DD-MM-YYYY (not strict for valid ranges, just the pattern)
   const match = str.match(/\d{2}-\d{2}-\d{4}/);
   return match ? match[0] : str;
 }
-
+const ALL_UNITS = [
+  "g",
+  "kg",
+  "ml",
+  "l",
+  "cup",
+  "tbsp",
+  "tsp",
+  "pcs",
+  "slice",
+  "can",
+  "oz",
+  "lb",
+  "pinch",
+  "dash",
+  "pack",
+  "box",
+];
+function autoConvertUnit(quantity, unit) {
+  let num = parseFloat(quantity);
+  let u = unit;
+  if (u === "g" && num >= 1000) return [+(num / 1000).toFixed(2), "kg"];
+  if (u === "kg" && num < 1) return [+(num * 1000).toFixed(2), "g"];
+  if (u === "ml" && num >= 1000) return [+(num / 1000).toFixed(2), "l"];
+  if (u === "l" && num < 1) return [+(num * 1000).toFixed(2), "ml"];
+  if (u === "oz" && num >= 16) return [+(num / 16).toFixed(2), "lb"];
+  if (u === "tsp" && num >= 3) return [+(num / 3).toFixed(2), "tbsp"];
+  if (u === "tbsp" && num >= 16) return [+(num / 16).toFixed(2), "cup"];
+  return [isNaN(num) ? "" : +num.toFixed(2), u];
+}
+function todayAsDDMMYYYY() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const yyyy = now.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
 const initialNewItem = {
   itemName: "",
   quantity: 1,
-  unit: "",
+  unit: "g",
   note: "",
   dateAdded: "",
 };
@@ -40,14 +73,33 @@ export default function GroceryListsPage() {
   const [newItem, setNewItem] = useState(initialNewItem);
   const [editingId, setEditingId] = useState(null);
   const [editItem, setEditItem] = useState(null);
+  const [justUnpurchasedIds, setJustUnpurchasedIds] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
+  const [ingredientSuggestions, setIngredientSuggestions] = useState([]);
   const navigate = useNavigate();
 
-  // Fetch both active & purchased items
-  async function fetchAll() {
+  async function fetchAll(unpurchasedIds = []) {
     setLoading(true);
     try {
-      setActiveItems(await getActiveItems());
-      setPurchasedItems(await getPurchasedItems());
+      let actives = await getActiveItems();
+      let purchased = await getPurchasedItems();
+      if (unpurchasedIds.length > 0) {
+        actives = actives.map((item) =>
+          unpurchasedIds.includes(item.id)
+            ? { ...item, dateAdded: todayAsDDMMYYYY() }
+            : item
+        );
+      }
+      actives = actives.map((item) => {
+        const [qty, u] = autoConvertUnit(item.quantity, item.unit);
+        return { ...item, quantity: qty, unit: u };
+      });
+      purchased = purchased.map((item) => {
+        const [qty, u] = autoConvertUnit(item.quantity, item.unit);
+        return { ...item, quantity: qty, unit: u };
+      });
+      setActiveItems(actives);
+      setPurchasedItems(purchased);
       setError("");
     } catch {
       setError("Failed to fetch grocery items.");
@@ -58,6 +110,10 @@ export default function GroceryListsPage() {
 
   useEffect(() => {
     fetchAll();
+    // Fetch ingredient names for autocomplete
+    getAllIngredients()
+      .then((list) => setIngredients(list))
+      .catch(() => setIngredients([]));
   }, []);
 
   function resetForm() {
@@ -65,22 +121,39 @@ export default function GroceryListsPage() {
     setEditingId(null);
     setEditItem(null);
     setNewItem(initialNewItem);
+    setIngredientSuggestions([]);
   }
 
-  // Add new item
+  // Autocomplete ingredient suggestions
+  function handleItemNameChange(val) {
+    setNewItem({ ...newItem, itemName: val });
+    // case-insensitive match
+    if (val && ingredients.length > 0) {
+      const matches = ingredients
+        .filter((ing) => ing.name.toLowerCase().includes(val.toLowerCase()))
+        .slice(0, 7);
+      setIngredientSuggestions(matches);
+    } else {
+      setIngredientSuggestions([]);
+    }
+  }
+  function handleSuggestionClick(name) {
+    setNewItem({ ...newItem, itemName: name });
+    setIngredientSuggestions([]);
+  }
+
   async function handleAdd() {
     if (!newItem.itemName.trim()) {
       setError("Item name is required.");
       return;
     }
     try {
+      const [qty, unit] = autoConvertUnit(newItem.quantity, newItem.unit);
       await addItem({
         ...newItem,
-        dateAdded: new Date()
-          .toLocaleDateString("en-GB")
-          .split("/")
-          .reverse()
-          .join("-"),
+        quantity: qty,
+        unit: unit,
+        dateAdded: todayAsDDMMYYYY(),
       });
       resetForm();
       fetchAll();
@@ -88,23 +161,20 @@ export default function GroceryListsPage() {
       setError("Failed to add item.");
     }
   }
-
-  // Edit item
   async function handleEditSave() {
     if (!editItem.itemName.trim()) {
       setError("Item name is required.");
       return;
     }
     try {
-      await updateItem(editingId, editItem);
+      const [qty, unit] = autoConvertUnit(editItem.quantity, editItem.unit);
+      await updateItem(editingId, { ...editItem, quantity: qty, unit: unit });
       resetForm();
       fetchAll();
     } catch {
       setError("Failed to update item.");
     }
   }
-
-  // Delete item
   async function handleDelete(id) {
     if (!window.confirm("Are you sure you want to delete this item?")) return;
     try {
@@ -114,8 +184,26 @@ export default function GroceryListsPage() {
       setError("Failed to delete item.");
     }
   }
-
-  // Delete all items in a section (active or purchased)
+  async function handleDeleteSelected(type) {
+    const ids = type === "active" ? selectedIds : selectedPurchasedIds;
+    if (!ids.length) return;
+    if (!window.confirm("Are you sure you want to delete the selected items?"))
+      return;
+    setLoading(true);
+    setError("");
+    try {
+      for (const id of ids) {
+        await deleteItem(id);
+      }
+      if (type === "active") setSelectedIds([]);
+      if (type === "purchased") setSelectedPurchasedIds([]);
+      fetchAll();
+    } catch {
+      setError("Failed to delete selected items.");
+    } finally {
+      setLoading(false);
+    }
+  }
   async function handleDeleteAll(section) {
     let items = section === "active" ? activeItems : purchasedItems;
     if (!items.length) return;
@@ -142,8 +230,6 @@ export default function GroceryListsPage() {
       setLoading(false);
     }
   }
-
-  // Mark selected active as purchased
   async function handleMarkPurchased() {
     if (!selectedIds.length) {
       setError("Select items to mark as purchased.");
@@ -157,8 +243,6 @@ export default function GroceryListsPage() {
       setError("Failed to mark as purchased.");
     }
   }
-
-  // Undo purchased
   async function handleUndoPurchased() {
     if (!selectedPurchasedIds.length) {
       setError("Select items to undo purchased.");
@@ -166,170 +250,190 @@ export default function GroceryListsPage() {
     }
     try {
       await undoPurchased(selectedPurchasedIds);
+      setJustUnpurchasedIds(selectedPurchasedIds);
       setSelectedPurchasedIds([]);
-      fetchAll();
+      fetchAll(selectedPurchasedIds);
     } catch {
       setError("Failed to undo purchased.");
+      setJustUnpurchasedIds([]);
     }
   }
-
-  // Table renderers
   function renderTable(items, selected, setSelected, purchased = false) {
     return (
-      <table className="min-w-full rounded-md text-sm">
-        <thead className={purchased ? "bg-indigo-50" : "bg-pink-50"}>
-          <tr>
-            <th></th>
-            <th className="py-3 px-3 text-left font-bold">Item</th>
-            <th className="py-3 px-3 text-left font-bold">Quantity</th>
-            <th className="py-3 px-3 text-left font-bold">Unit</th>
-            <th className="py-3 px-3 text-left font-bold">Note</th>
-            <th className="py-3 px-3 text-left font-bold">
-              {purchased ? "Date Purchased" : "Date"}
-            </th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.length === 0 && (
+      <>
+        <div style={{ marginBottom: "12px" }}>
+          <button
+            className="bg-red-500 text-white px-3 py-1 rounded mr-2"
+            onClick={() =>
+              handleDeleteSelected(purchased ? "purchased" : "active")
+            }
+            disabled={selected.length === 0 || loading}
+          >
+            Delete Selected
+          </button>
+        </div>
+        <table className="min-w-full rounded-md text-sm">
+          <thead className={purchased ? "bg-indigo-50" : "bg-pink-50"}>
             <tr>
-              <td colSpan={7} className="text-center text-gray-400 py-8">
-                {purchased ? "No purchased items." : "No items."}
-              </td>
+              <th></th>
+              <th className="py-3 px-3 text-left font-bold">Item</th>
+              <th className="py-3 px-3 text-left font-bold">Quantity</th>
+              <th className="py-3 px-3 text-left font-bold">Unit</th>
+              <th className="py-3 px-3 text-left font-bold">Note</th>
+              <th className="py-3 px-3 text-left font-bold">
+                {purchased ? "Date Purchased" : "Date"}
+              </th>
+              <th></th>
             </tr>
-          )}
-          {items.map((item) => (
-            <tr
-              key={item.id}
-              className="odd:bg-gray-50 hover:bg-pink-50 transition border-b"
-            >
-              <td>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(item.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) setSelected([...selected, item.id]);
-                    else setSelected(selected.filter((id) => id !== item.id));
-                  }}
-                />
-              </td>
-              <td>
-                {editingId === item.id ? (
+          </thead>
+          <tbody>
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={7} className="text-center text-gray-400 py-8">
+                  {purchased ? "No purchased items." : "No items."}
+                </td>
+              </tr>
+            )}
+            {items.map((item) => (
+              <tr
+                key={item.id}
+                className="odd:bg-gray-50 hover:bg-pink-50 transition border-b"
+              >
+                <td>
                   <input
-                    type="text"
-                    className="border p-1 w-28"
-                    value={editItem.itemName}
-                    onChange={(e) =>
-                      setEditItem({ ...editItem, itemName: e.target.value })
-                    }
+                    type="checkbox"
+                    checked={selected.includes(item.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelected([...selected, item.id]);
+                      else setSelected(selected.filter((id) => id !== item.id));
+                    }}
                   />
-                ) : (
-                  item.itemName
-                )}
-              </td>
-              <td>
-                {editingId === item.id ? (
-                  <input
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    className="border p-1 w-16"
-                    value={editItem.quantity}
-                    onChange={(e) =>
-                      setEditItem({
-                        ...editItem,
-                        quantity: Number(e.target.value),
-                      })
-                    }
-                  />
-                ) : (
-                  item.quantity
-                )}
-              </td>
-              <td>
-                {editingId === item.id ? (
-                  <input
-                    type="text"
-                    className="border p-1 w-16"
-                    value={editItem.unit || ""}
-                    onChange={(e) =>
-                      setEditItem({ ...editItem, unit: e.target.value })
-                    }
-                  />
-                ) : (
-                  item.unit
-                )}
-              </td>
-              <td>
-                {editingId === item.id ? (
-                  <input
-                    type="text"
-                    className="border p-1 w-32"
-                    value={editItem.note || ""}
-                    onChange={(e) =>
-                      setEditItem({ ...editItem, note: e.target.value })
-                    }
-                  />
-                ) : (
-                  item.note
-                )}
-              </td>
-              <td>
-                {editingId === item.id ? (
-                  <input
-                    type="text"
-                    className="border p-1 w-20"
-                    value={editItem.dateAdded}
-                    onChange={(e) =>
-                      setEditItem({ ...editItem, dateAdded: e.target.value })
-                    }
-                  />
-                ) : purchased ? (
-                  extractDate(item.datePurchased)
-                ) : (
-                  extractDate(item.dateAdded)
-                )}
-              </td>
-              <td className="flex gap-1">
-                {editingId === item.id ? (
-                  <>
-                    <button
-                      className="bg-green-600 text-white px-2 py-1 rounded"
-                      onClick={handleEditSave}
+                </td>
+                <td>
+                  {editingId === item.id ? (
+                    <input
+                      type="text"
+                      className="border p-1 w-28"
+                      value={editItem.itemName}
+                      onChange={(e) =>
+                        setEditItem({ ...editItem, itemName: e.target.value })
+                      }
+                    />
+                  ) : (
+                    item.itemName
+                  )}
+                </td>
+                <td>
+                  {editingId === item.id ? (
+                    <input
+                      type="number"
+                      min={0.01}
+                      step={0.01}
+                      className="border p-1 w-16"
+                      value={editItem.quantity}
+                      onChange={(e) =>
+                        setEditItem({
+                          ...editItem,
+                          quantity: e.target.value,
+                        })
+                      }
+                    />
+                  ) : (
+                    item.quantity
+                  )}
+                </td>
+                <td>
+                  {editingId === item.id ? (
+                    <select
+                      className="border p-1 w-16"
+                      value={editItem.unit}
+                      onChange={(e) =>
+                        setEditItem({ ...editItem, unit: e.target.value })
+                      }
                     >
-                      Save
-                    </button>
-                    <button
-                      className="bg-gray-400 text-white px-2 py-1 rounded"
-                      onClick={resetForm}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      className="bg-blue-600 text-white px-2 py-1 rounded mr-1"
-                      onClick={() => {
-                        setEditingId(item.id);
-                        setEditItem({ ...item });
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="bg-red-600 text-white px-2 py-1 rounded"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      &#10005;
-                    </button>
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                      {ALL_UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    item.unit
+                  )}
+                </td>
+                <td>
+                  {editingId === item.id ? (
+                    <input
+                      type="text"
+                      className="border p-1 w-32"
+                      value={editItem.note || ""}
+                      onChange={(e) =>
+                        setEditItem({ ...editItem, note: e.target.value })
+                      }
+                    />
+                  ) : (
+                    item.note
+                  )}
+                </td>
+                <td>
+                  {editingId === item.id ? (
+                    <input
+                      type="text"
+                      className="border p-1 w-20"
+                      value={editItem.dateAdded}
+                      onChange={(e) =>
+                        setEditItem({ ...editItem, dateAdded: e.target.value })
+                      }
+                    />
+                  ) : purchased ? (
+                    extractDate(item.datePurchased)
+                  ) : justUnpurchasedIds.includes(item.id) ? (
+                    todayAsDDMMYYYY()
+                  ) : (
+                    extractDate(item.dateAdded)
+                  )}
+                </td>
+                <td className="flex gap-1">
+                  {editingId === item.id ? (
+                    <>
+                      <button
+                        className="bg-green-600 text-white px-2 py-1 rounded"
+                        onClick={handleEditSave}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="bg-gray-400 text-white px-2 py-1 rounded"
+                        onClick={resetForm}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="bg-blue-600 text-white px-2 py-1 rounded mr-1"
+                        onClick={() => {
+                          setEditingId(item.id);
+                          setEditItem({ ...item });
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="bg-red-600 text-white px-2 py-1 rounded"
+                        onClick={() => handleDelete(item.id)}
+                      >
+                        &#10005;
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </>
     );
   }
 
@@ -387,16 +491,51 @@ export default function GroceryListsPage() {
             Delete All Active
           </button>
           {adding && (
-            <div className="mb-4 bg-gray-50 px-3 py-2 rounded shadow flex flex-wrap gap-3 items-center">
-              <input
-                type="text"
-                className="border p-1 w-28"
-                placeholder="Item"
-                value={newItem.itemName}
-                onChange={(e) =>
-                  setNewItem({ ...newItem, itemName: e.target.value })
-                }
-              />
+            <div
+              className="mb-4 bg-gray-50 px-3 py-2 rounded shadow flex flex-wrap gap-3 items-center"
+              style={{ position: "relative" }}
+            >
+              <div style={{ position: "relative", width: "160px" }}>
+                <input
+                  type="text"
+                  className="border p-1 w-28"
+                  placeholder="Item"
+                  value={newItem.itemName}
+                  onChange={(e) => handleItemNameChange(e.target.value)}
+                  autoComplete="off"
+                />
+                {ingredientSuggestions.length > 0 && (
+                  <ul
+                    style={{
+                      position: "absolute",
+                      top: "28px",
+                      left: 0,
+                      background: "#fff",
+                      border: "1px solid #ddd",
+                      width: "160px",
+                      zIndex: 10,
+                      maxHeight: "180px",
+                      overflowY: "auto",
+                      borderRadius: "0 0 8px 8px",
+                    }}
+                  >
+                    {ingredientSuggestions.map((sug) => (
+                      <li
+                        key={sug.id}
+                        style={{ padding: "4px 8px", cursor: "pointer" }}
+                        onClick={() => handleSuggestionClick(sug.name)}
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter")
+                            handleSuggestionClick(sug.name);
+                        }}
+                      >
+                        {sug.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <input
                 type="number"
                 min={0.01}
@@ -405,18 +544,22 @@ export default function GroceryListsPage() {
                 placeholder="Qty"
                 value={newItem.quantity}
                 onChange={(e) =>
-                  setNewItem({ ...newItem, quantity: Number(e.target.value) })
+                  setNewItem({ ...newItem, quantity: e.target.value })
                 }
               />
-              <input
-                type="text"
+              <select
                 className="border p-1 w-16"
-                placeholder="Unit"
                 value={newItem.unit}
                 onChange={(e) =>
                   setNewItem({ ...newItem, unit: e.target.value })
                 }
-              />
+              >
+                {ALL_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
               <input
                 type="text"
                 className="border p-1 w-32"
