@@ -19,7 +19,6 @@ export default function MealPlansPage() {
   const [editPlan, setEditPlan] = useState(null);
   const [error, setError] = useState();
   const [selected, setSelected] = useState([]);
-  const [listDate, setListDate] = useState("");
   const [generating, setGenerating] = useState(false);
   const [hasActiveGroceryList, setHasActiveGroceryList] = useState(false);
 
@@ -50,7 +49,6 @@ export default function MealPlansPage() {
 
   useEffect(() => {
     fetchAll();
-    setListDate(todayDDMMYYYY());
     checkActiveGroceryList();
     // eslint-disable-next-line
   }, []);
@@ -93,19 +91,15 @@ export default function MealPlansPage() {
   }
 
   // Generate dynamic name: join plan names with _ then add _{date}_List
-  function dynamicGroceryListName() {
+  function dynamicGroceryListName(dateStr) {
     if (!selected.length) return "";
     const plans = mealPlans.filter((mp) => selected.includes(mp.id));
     const names = plans.map((mp) => mp.name || "MealPlan");
     const joinedName = names.join("_");
-    return `${joinedName}_${listDate}_List`;
+    return `${joinedName}_${dateStr}_List`;
   }
 
   async function handleGenerate() {
-    if (!listDate.trim()) {
-      setError("Please enter a date for the grocery list.");
-      return;
-    }
     if (selected.length === 0) {
       setError("Please select at least one meal plan.");
       return;
@@ -113,8 +107,9 @@ export default function MealPlansPage() {
     setGenerating(true);
     setError();
     try {
-      const autoName = dynamicGroceryListName();
-      await generateFromMealPlans(selected, autoName, listDate);
+      const todayDate = todayDDMMYYYY();
+      const autoName = dynamicGroceryListName(todayDate);
+      await generateFromMealPlans(selected, autoName, todayDate);
       setGenerating(false);
       navigate("/grocerylists");
     } catch (e) {
@@ -139,10 +134,11 @@ export default function MealPlansPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
+  // Re-check for active grocery list whenever selection or form opens
   useEffect(() => {
     checkActiveGroceryList();
     // eslint-disable-next-line
-  }, [selected, listDate, showForm]);
+  }, [selected, showForm]);
 
   return (
     <section className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
@@ -177,21 +173,6 @@ export default function MealPlansPage() {
         <span className="font-semibold mr-2">
           Select meal plans to generate a grocery list
         </span>
-        {/* No name input, no name label shown */}
-        <input
-          type="date"
-          className="border rounded px-2 py-1 mr-2"
-          value={(() => {
-            if (!listDate) return "";
-            const [dd, mm, yyyy] = listDate.split("-");
-            return `${yyyy}-${mm}-${dd}`;
-          })()}
-          onChange={(e) => {
-            const [yyyy, mm, dd] = e.target.value.split("-");
-            setListDate(`${dd}-${mm}-${yyyy}`);
-          }}
-          required
-        />
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
           onClick={handleGenerate}

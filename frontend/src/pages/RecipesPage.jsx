@@ -19,12 +19,10 @@ export default function RecipesPage() {
   const [editRecipe, setEditRecipe] = useState(null);
   const [error, setError] = useState();
   const [selected, setSelected] = useState([]);
-  const [listDate, setListDate] = useState("");
   const [generating, setGenerating] = useState(false);
   const [hasActiveGroceryList, setHasActiveGroceryList] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch recipes
   const fetchAllRecipes = async () => {
     setLoading(true);
     try {
@@ -37,7 +35,7 @@ export default function RecipesPage() {
     }
   };
 
-  // Fetch grocery lists and check for any active (not purchased) list
+  // Check for any active (not purchased) grocery list
   const checkActiveGroceryList = async () => {
     try {
       const lists = await getGroceryLists();
@@ -49,7 +47,6 @@ export default function RecipesPage() {
 
   useEffect(() => {
     fetchAllRecipes();
-    setListDate(todayDDMMYYYY());
     checkActiveGroceryList();
     // eslint-disable-next-line
   }, []);
@@ -92,10 +89,6 @@ export default function RecipesPage() {
   }
 
   async function handleGenerateList() {
-    if (!listDate.trim()) {
-      setError("Please enter a date for the grocery list.");
-      return;
-    }
     if (!selected.length) {
       setError("Select at least one recipe to generate the grocery list.");
       return;
@@ -103,10 +96,11 @@ export default function RecipesPage() {
     setGenerating(true);
     setError();
     try {
-      const dateStr = listDate;
+      // Use today's date in DD-MM-YYYY
+      const dateStr = todayDDMMYYYY();
       const firstId = selected[0];
       const dynamicName = `Recipe_${dateStr}_${firstId}`;
-      await generateFromRecipes(selected, dynamicName, listDate);
+      await generateFromRecipes(selected, dynamicName, dateStr);
       setGenerating(false);
       navigate("/grocerylists");
     } catch (e) {
@@ -131,11 +125,11 @@ export default function RecipesPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
-  // Whenever selection or date changes, ensure we check for an active grocery list (e.g. if new tab, etc.)
+  // Re-check for an active grocery list whenever selection or form opens
   useEffect(() => {
     checkActiveGroceryList();
     // eslint-disable-next-line
-  }, [selected, listDate, showForm]);
+  }, [selected, showForm]);
 
   return (
     <section className="max-w-4xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
@@ -163,23 +157,11 @@ export default function RecipesPage() {
           {error}
         </div>
       )}
+      {/* Selection and Generate */}
       <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
         <span className="font-semibold mr-2">
           Select recipes to generate a grocery list
         </span>
-        <input
-          type="date"
-          className="border rounded px-2 py-1 mr-2"
-          value={(() => {
-            const [dd, mm, yyyy] = listDate.split("-");
-            return `${yyyy}-${mm}-${dd}`;
-          })()}
-          onChange={(e) => {
-            const [yyyy, mm, dd] = e.target.value.split("-");
-            setListDate(`${dd}-${mm}-${yyyy}`);
-          }}
-          required
-        />
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
           onClick={handleGenerateList}
