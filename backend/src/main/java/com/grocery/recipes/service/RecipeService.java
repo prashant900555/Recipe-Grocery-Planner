@@ -10,4 +10,7 @@ public interface RecipeService {
     Optional<Recipe> findById(Long id);
     Recipe save(Recipe recipe);
     void deleteById(Long id);
+
+    // NEW: Method for updating servings and scaling ingredient quantities
+    void updateServingsAndScaleQuantities(Long id, Integer newServings);
 }

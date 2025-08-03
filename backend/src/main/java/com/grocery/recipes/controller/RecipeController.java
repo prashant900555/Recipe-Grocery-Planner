@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -61,6 +62,26 @@ public class RecipeController {
             return ResponseEntity.noContent().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+    }
+
+    // NEW: PATCH /api/recipes/{id}/servings - Updates servings and scales ingredient quantities
+    @PatchMapping("/{id}/servings")
+    public ResponseEntity<Void> updateServingsAndQuantities(
+            @PathVariable Long id,
+            @RequestBody Map<String, Integer> payload) {
+
+        if (!payload.containsKey("servings")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            recipeService.updateServingsAndScaleQuantities(id, payload.get("servings"));
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }
