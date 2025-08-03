@@ -112,6 +112,34 @@ export default function GroceryListsPage() {
     }
   }
 
+  // Delete all items in a section (active or purchased)
+  async function handleDeleteAll(section) {
+    let items = section === "active" ? activeItems : purchasedItems;
+    if (!items.length) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ALL ${
+          section === "active" ? "active" : "purchased"
+        } items? This cannot be undone.`
+      )
+    )
+      return;
+    setLoading(true);
+    setError("");
+    try {
+      for (const item of items) {
+        await deleteItem(item.id);
+      }
+      if (section === "active") setSelectedIds([]);
+      if (section === "purchased") setSelectedPurchasedIds([]);
+      fetchAll();
+    } catch {
+      setError("Failed to delete all items.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Mark selected active as purchased
   async function handleMarkPurchased() {
     if (!selectedIds.length) {
@@ -347,6 +375,14 @@ export default function GroceryListsPage() {
           >
             Add Item
           </button>
+          <button
+            className="bg-red-700 text-white px-4 py-2 rounded-lg shadow mb-4 ml-2"
+            onClick={() => handleDeleteAll("active")}
+            disabled={activeItems.length === 0 || loading}
+            title="Delete all active items"
+          >
+            Delete All Active
+          </button>
           {adding && (
             <div className="mb-4 bg-gray-50 px-3 py-2 rounded shadow flex flex-wrap gap-3 items-center">
               <input
@@ -415,6 +451,14 @@ export default function GroceryListsPage() {
       )}
       {showPurchased && (
         <div>
+          <button
+            className="bg-red-700 text-white px-4 py-2 rounded-lg shadow mb-4"
+            onClick={() => handleDeleteAll("purchased")}
+            disabled={purchasedItems.length === 0 || loading}
+            title="Delete all purchased items"
+          >
+            Delete All Purchased
+          </button>
           <div className="mb-4">
             <button
               className="bg-indigo-700 text-white px-4 py-2 rounded-full"
