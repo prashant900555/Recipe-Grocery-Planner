@@ -1,3 +1,6 @@
+/**
+ * @deprecated This component is legacy.
+ */
 import React, { useState, useEffect } from "react";
 import { getIngredients } from "../services/ingredientService";
 import { getMealPlans } from "../services/mealPlanService";

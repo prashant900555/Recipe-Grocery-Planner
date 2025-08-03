@@ -7,7 +7,7 @@ import {
 } from "../services/mealPlanService";
 import {
   generateFromMealPlans,
-  getGroceryLists,
+  getActiveItems,
 } from "../services/groceryListService";
 import MealPlanForm from "../components/MealPlanForm";
 import { useNavigate } from "react-router-dom";
@@ -40,7 +40,7 @@ export default function MealPlansPage() {
   // Check for any active grocery list (completed === false)
   const checkActiveGroceryList = async () => {
     try {
-      const lists = await getGroceryLists();
+      const lists = await getActiveItems();
       setHasActiveGroceryList(lists.some((l) => !l.completed));
     } catch {
       setHasActiveGroceryList(false);

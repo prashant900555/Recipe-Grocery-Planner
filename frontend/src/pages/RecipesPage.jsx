@@ -8,7 +8,7 @@ import {
 } from "../services/recipeService";
 import {
   generateFromRecipes,
-  getGroceryLists,
+  getActiveItems,
 } from "../services/groceryListService";
 import RecipeForm from "../components/RecipeForm";
 import { useNavigate } from "react-router-dom";
@@ -89,7 +89,7 @@ export default function RecipesPage() {
   // Check for any active (not purchased) grocery list
   const checkActiveGroceryList = async () => {
     try {
-      const lists = await getGroceryLists();
+      const lists = await getActiveItems();
       setHasActiveGroceryList(lists.some((l) => !l.completed));
     } catch {
       setHasActiveGroceryList(false);
