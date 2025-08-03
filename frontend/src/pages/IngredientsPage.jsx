@@ -5,51 +5,55 @@ import {
   updateIngredient,
   deleteIngredient,
 } from "../services/ingredientService";
-import IngredientForm from "../components/IngredientForm";
-import { useNavigate } from "react-router-dom";
 
 export default function IngredientsPage() {
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editIngredient, setEditIngredient] = useState(null);
-  const [errorMsg, setErrorMsg] = useState();
-  const navigate = useNavigate();
+  const [editing, setEditing] = useState(null);
+  const [name, setName] = useState("");
+  const [error, setError] = useState();
 
-  async function fetchAll() {
+  const fetchAll = async () => {
     setLoading(true);
     try {
       setIngredients(await getIngredients());
-      setErrorMsg();
+      setError();
     } catch {
-      setErrorMsg("Failed to fetch ingredients.");
+      setError("Failed to fetch ingredients.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  };
 
   useEffect(() => {
     fetchAll();
   }, []);
 
-  async function handleCreate(data) {
+  function resetForm() {
+    setEditing(null);
+    setName("");
+    setError();
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
     try {
-      await createIngredient(data);
-      setShowForm(false);
+      if (editing) {
+        await updateIngredient(editing.id, { name: name.trim() });
+      } else {
+        await createIngredient({ name: name.trim() });
+      }
+      resetForm();
       fetchAll();
     } catch {
-      setErrorMsg("Failed to create ingredient.");
+      setError("Failed to save ingredient.");
     }
   }
 
-  async function handleUpdate(data) {
-    try {
-      await updateIngredient(data.id, data);
-      setShowForm(false);
-      setEditIngredient(null);
-      fetchAll();
-    } catch {
-      setErrorMsg("Failed to update ingredient.");
-    }
+  function handleEdit(ingredient) {
+    setEditing(ingredient);
+    setName(ingredient.name);
+    setError();
   }
 
   async function handleDelete(id) {
@@ -58,93 +62,76 @@ export default function IngredientsPage() {
       await deleteIngredient(id);
       fetchAll();
     } catch {
-      setErrorMsg("Failed to delete ingredient.");
+      setError("Failed to delete ingredient.");
     }
   }
 
   return (
-    <section className="max-w-3xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
-      <button
-        type="button"
-        className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-        onClick={() => navigate("/")}
-      >
-        Back to Home
-      </button>
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
-        <h2 className="text-3xl font-bold text-blue-800">Ingredients</h2>
-        <button
-          className="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
-          onClick={() => {
-            setShowForm(true);
-            setEditIngredient(null);
-          }}
-        >
-          Add Ingredient
-        </button>
-      </div>
-      {errorMsg && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-          {errorMsg}
-        </div>
-      )}
-      {showForm && (
-        <div className="mb-8">
-          <IngredientForm
-            initialData={editIngredient}
-            onSubmit={editIngredient ? handleUpdate : handleCreate}
-            onCancel={() => {
-              setShowForm(false);
-              setEditIngredient(null);
-            }}
+    <section className="max-w-2xl mx-auto mt-8 p-6 bg-white rounded-lg shadow">
+      <h2 className="text-2xl font-bold mb-4 text-blue-800">Ingredients</h2>
+      <form className="mb-8 flex gap-2 items-end" onSubmit={handleSubmit}>
+        <div>
+          <label className="block mb-1">Name</label>
+          <input
+            type="text"
+            value={name}
+            required
+            onChange={(e) => setName(e.target.value)}
+            className="px-3 py-2 border rounded w-60"
           />
         </div>
-      )}
+        <button
+          className="bg-green-700 text-white px-4 py-2 rounded"
+          type="submit"
+        >
+          {editing ? "Update" : "Add"}
+        </button>
+        {editing && (
+          <button
+            className="ml-2 bg-gray-200 px-3 py-2 rounded"
+            onClick={resetForm}
+            type="button"
+          >
+            Cancel
+          </button>
+        )}
+      </form>
+      {error && <div className="mb-4 text-red-600">{error}</div>}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm rounded-md">
-          <thead className="bg-gray-100">
+        <table className="min-w-full text-sm">
+          <thead className="bg-blue-50">
             <tr>
-              <th className="py-3 px-4 text-left font-bold">#</th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
-              <th className="py-3 px-4 text-left font-bold">Unit</th>
               <th className="py-3 px-4"></th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
+          <tbody className="bg-white">
             {loading ? (
               <tr>
-                <td colSpan={5} className="text-center py-8 text-gray-400">
+                <td colSpan={2} className="text-center py-8 text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : ingredients.length === 0 ? (
               <tr>
-                <td
-                  colSpan={5}
-                  className="text-center py-10 text-gray-300 font-semibold"
-                >
+                <td colSpan={2} className="text-center py-8 text-gray-400">
                   No ingredients found.
                 </td>
               </tr>
             ) : (
-              ingredients.map((ing, idx) => (
-                <tr key={ing.id} className="hover:bg-blue-50 transition">
-                  <td className="py-2 px-4">{idx + 1}</td>
-                  <td className="py-2 px-4 capitalize">{ing.name}</td>
-                  <td className="py-2 px-4">{ing.unit}</td>
+              ingredients.map((ingredient) => (
+                <tr key={ingredient.id} className="border-t border-gray-100">
+                  <td className="py-2 px-4">{ingredient.name}</td>
                   <td className="py-2 px-4 flex gap-2">
                     <button
-                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                      onClick={() => {
-                        setShowForm(true);
-                        setEditIngredient(ing);
-                      }}
+                      className="px-3 py-1 bg-blue-500 text-white rounded"
+                      onClick={() => handleEdit(ingredient)}
                     >
                       Edit
                     </button>
                     <button
-                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                      onClick={() => handleDelete(ing.id)}
+                      className="px-3 py-1 bg-red-600 text-white rounded"
+                      onClick={() => handleDelete(ingredient.id)}
                     >
                       Delete
                     </button>
