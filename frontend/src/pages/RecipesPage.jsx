@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   getRecipes,
   createRecipe,
   updateRecipe,
   deleteRecipe,
+  updateRecipeServings, // NEW import
 } from "../services/recipeService";
 import {
   generateFromRecipes,
@@ -11,6 +12,19 @@ import {
 } from "../services/groceryListService";
 import RecipeForm from "../components/RecipeForm";
 import { useNavigate } from "react-router-dom";
+
+// Debounce utility function
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 // Unit conversion utility functions
 const convertUnits = (quantity, unit) => {
@@ -33,12 +47,10 @@ const convertUnits = (quantity, unit) => {
     return `${(num * 1000).toFixed(2)} ml`;
   }
 
-  // Ounce conversions
+  // Other conversions
   if (unit === "oz" && num >= 16) {
     return `${(num / 16).toFixed(2)} lb`;
   }
-
-  // Tablespoon/teaspoon conversions
   if (unit === "tsp" && num >= 3) {
     return `${(num / 3).toFixed(2)} tbsp`;
   }
@@ -47,12 +59,6 @@ const convertUnits = (quantity, unit) => {
   }
 
   return `${num.toFixed(2)} ${unit}`;
-};
-
-const scaleQuantity = (originalQuantity, originalServings, newServings) => {
-  if (!originalQuantity || !originalServings || !newServings)
-    return originalQuantity;
-  return (parseFloat(originalQuantity) * newServings) / originalServings;
 };
 
 export default function RecipesPage() {
@@ -64,7 +70,7 @@ export default function RecipesPage() {
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [hasActiveGroceryList, setHasActiveGroceryList] = useState(false);
-  const [servingsAdjustments, setServingsAdjustments] = useState({});
+  const [servingsUpdateQueue, setServingsUpdateQueue] = useState({}); // Track pending updates
   const navigate = useNavigate();
 
   const fetchAllRecipes = async () => {
@@ -72,12 +78,6 @@ export default function RecipesPage() {
     try {
       const fetchedRecipes = await getRecipes();
       setRecipes(fetchedRecipes);
-      // Initialize servings adjustments with original servings from recipes
-      const initialAdjustments = {};
-      fetchedRecipes.forEach((recipe) => {
-        initialAdjustments[recipe.id] = recipe.servings || 1;
-      });
-      setServingsAdjustments(initialAdjustments);
       setError();
     } catch {
       setError("Failed to fetch recipes.");
@@ -95,6 +95,40 @@ export default function RecipesPage() {
       setHasActiveGroceryList(false);
     }
   };
+
+  // Debounced function to update servings and scale quantities in backend
+  const debouncedUpdateServings = useCallback(
+    debounce(async (recipeId, servings) => {
+      try {
+        await updateRecipeServings(recipeId, servings);
+
+        // Refresh recipes to get updated quantities from database
+        await fetchAllRecipes();
+
+        // Remove from pending updates queue
+        setServingsUpdateQueue((prev) => {
+          const newQueue = { ...prev };
+          delete newQueue[recipeId];
+          return newQueue;
+        });
+
+        console.log(
+          `Successfully updated servings and quantities for recipe ${recipeId} to ${servings}`
+        );
+      } catch (error) {
+        console.error("Failed to update servings:", error);
+        setError(`Failed to save servings update for recipe ${recipeId}`);
+
+        // Remove from pending updates queue on error too
+        setServingsUpdateQueue((prev) => {
+          const newQueue = { ...prev };
+          delete newQueue[recipeId];
+          return newQueue;
+        });
+      }
+    }, 2000), // 2-second delay
+    []
+  );
 
   useEffect(() => {
     fetchAllRecipes();
@@ -140,14 +174,15 @@ export default function RecipesPage() {
 
   function handleServingsChange(recipeId, newServings) {
     const parsedServings = parseInt(newServings) || 1;
-    setServingsAdjustments((prev) => ({
+
+    // Track pending update
+    setServingsUpdateQueue((prev) => ({
       ...prev,
       [recipeId]: parsedServings,
     }));
-  }
 
-  function getCurrentServings(recipe) {
-    return servingsAdjustments[recipe.id] || recipe.servings || 1;
+    // Debounced backend update (this will scale quantities in database)
+    debouncedUpdateServings(recipeId, parsedServings);
   }
 
   async function handleGenerateList() {
@@ -279,8 +314,8 @@ export default function RecipesPage() {
               </tr>
             ) : (
               recipes.map((rec, idx) => {
-                const currentServings = getCurrentServings(rec);
-                const originalServings = rec.servings || 1;
+                const hasPendingUpdate = servingsUpdateQueue[rec.id];
+                const displayServings = hasPendingUpdate || rec.servings || 1;
 
                 return (
                   <tr key={rec.id} className="hover:bg-blue-50 transition">
@@ -296,17 +331,29 @@ export default function RecipesPage() {
                       {rec.name}
                     </td>
                     <td className="py-2 px-4">{rec.description}</td>
-                    <td className="py-2 px-4">
+                    <td className="py-2 px-4 relative">
                       <input
                         type="number"
                         min="1"
                         max="100"
-                        className="border border-gray-300 rounded px-2 py-1 w-16 text-center"
-                        value={currentServings}
+                        className={`border border-gray-300 rounded px-2 py-1 w-16 text-center ${
+                          hasPendingUpdate
+                            ? "bg-yellow-50 border-yellow-300"
+                            : ""
+                        }`}
+                        value={displayServings}
                         onChange={(e) =>
                           handleServingsChange(rec.id, e.target.value)
                         }
+                        title={
+                          hasPendingUpdate
+                            ? "Updating quantities..."
+                            : "Change servings"
+                        }
                       />
+                      {hasPendingUpdate && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                      )}
                     </td>
                     <td className="py-2 px-4">
                       {rec.ingredients && rec.ingredients.length > 0 ? (
@@ -339,35 +386,18 @@ export default function RecipesPage() {
                                       {ri.ingredient.name}
                                     </td>
                                     <td className="px-2 py-1">
-                                      {(() => {
-                                        const scaledQty = scaleQuantity(
+                                      {
+                                        convertUnits(
                                           ri.quantity,
-                                          originalServings,
-                                          currentServings
-                                        );
-                                        const converted = convertUnits(
-                                          scaledQty,
                                           ri.unit
-                                        );
-                                        return converted.split(" ")[0];
-                                      })()}
+                                        ).split(" ")[0]
+                                      }
                                     </td>
                                     <td className="px-2 py-1">
-                                      {(() => {
-                                        const scaledQty = scaleQuantity(
-                                          ri.quantity,
-                                          originalServings,
-                                          currentServings
-                                        );
-                                        const converted = convertUnits(
-                                          scaledQty,
-                                          ri.unit
-                                        );
-                                        return converted
-                                          .split(" ")
-                                          .slice(1)
-                                          .join(" ");
-                                      })()}
+                                      {convertUnits(ri.quantity, ri.unit)
+                                        .split(" ")
+                                        .slice(1)
+                                        .join(" ")}
                                     </td>
                                     <td className="px-2 py-1 text-gray-600">
                                       {ri.note ? `(${ri.note})` : "-"}

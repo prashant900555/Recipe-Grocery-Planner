@@ -25,3 +25,9 @@ export async function updateRecipe(id, recipe) {
 export async function deleteRecipe(id) {
   await axios.delete(`${API_URL}/${id}`);
 }
+
+// NEW: Update servings and scale quantities in database
+export async function updateRecipeServings(id, servings) {
+  const res = await axios.patch(`${API_URL}/${id}/servings`, { servings });
+  return res.data;
+}
