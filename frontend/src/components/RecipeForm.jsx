@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { getIngredients } from "../services/ingredientService";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  memo,
+  useLayoutEffect,
+} from "react";
+import {
+  getIngredients,
+  createIngredient,
+} from "../services/ingredientService";
 
 const UNIT_OPTIONS = [
   "g",
@@ -15,17 +25,164 @@ const UNIT_OPTIONS = [
   "oz",
 ];
 
+// Memoized AutocompleteInput component to prevent unnecessary re-renders
+const AutocompleteInput = memo(
+  ({
+    row,
+    idx,
+    onInputChange,
+    onIngredientSelect,
+    onAddNewIngredient,
+    allIngredients,
+    activeMenu,
+    setActiveMenu,
+  }) => {
+    const inputRef = useRef();
+    const [cursorPosition, setCursorPosition] = useState(0);
+
+    // Preserve cursor position
+    useLayoutEffect(() => {
+      if (inputRef.current && document.activeElement === inputRef.current) {
+        inputRef.current.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    }, [row.inputValue, cursorPosition]);
+
+    const handleInputChange = useCallback(
+      (e) => {
+        setCursorPosition(e.target.selectionStart);
+        onInputChange(idx, e.target.value);
+        setActiveMenu(idx);
+      },
+      [idx, onInputChange, setActiveMenu]
+    );
+
+    const handleFocus = useCallback(() => {
+      setActiveMenu(idx);
+    }, [idx, setActiveMenu]);
+
+    const handleBlur = useCallback(() => {
+      setTimeout(() => setActiveMenu(null), 150);
+    }, [setActiveMenu]);
+
+    const handleKeyDown = useCallback(
+      (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (!row.inputValue?.trim()) return;
+
+          const exactMatch = allIngredients.find(
+            (i) =>
+              i.name.trim().toLowerCase() ===
+              row.inputValue.trim().toLowerCase()
+          );
+
+          if (exactMatch) {
+            onIngredientSelect(idx, exactMatch);
+          } else {
+            onAddNewIngredient(idx, row.inputValue);
+          }
+        }
+      },
+      [
+        row.inputValue,
+        idx,
+        allIngredients,
+        onIngredientSelect,
+        onAddNewIngredient,
+      ]
+    );
+
+    const handleSuggestionClick = useCallback(
+      (ingredient) => {
+        onIngredientSelect(idx, ingredient);
+      },
+      [idx, onIngredientSelect]
+    );
+
+    const handleAddNewClick = useCallback(() => {
+      onAddNewIngredient(idx, row.inputValue);
+    }, [idx, row.inputValue, onAddNewIngredient]);
+
+    const lcInput = row.inputValue ? row.inputValue.toLowerCase() : "";
+    const options = row.inputValue
+      ? allIngredients.filter((i) => i.name.toLowerCase().includes(lcInput))
+      : [];
+    const exactMatch = allIngredients.some(
+      (i) => i.name.trim().toLowerCase() === lcInput
+    );
+
+    return (
+      <div style={{ position: "relative" }}>
+        <input
+          ref={inputRef}
+          type="text"
+          className="border border-gray-300 rounded px-2 py-1 w-32"
+          value={row.inputValue}
+          placeholder="Ingredient name"
+          onChange={handleInputChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {activeMenu === idx && !!row.inputValue?.trim() && (
+          <ul
+            className="absolute z-10 bg-white shadow border border-gray-200 mt-1 rounded text-sm max-h-52 overflow-auto w-full"
+            style={{ minWidth: "200px" }}
+          >
+            {options.map((opt) => (
+              <li
+                key={opt.id}
+                className="px-3 py-1 hover:bg-blue-100 cursor-pointer"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSuggestionClick(opt);
+                }}
+              >
+                {opt.name}
+              </li>
+            ))}
+            {!exactMatch && row.inputValue && (
+              <li
+                className="px-3 py-1 bg-green-50 hover:bg-green-100 cursor-pointer text-green-800"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleAddNewClick();
+                }}
+              >
+                + Add new ingredient: <b>{row.inputValue}</b>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    );
+  }
+);
+
 export default function RecipeForm({ initialData, onSubmit, onCancel }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [ingredients, setIngredients] = useState([]);
   const [allIngredients, setAllIngredients] = useState([]);
   const [error, setError] = useState();
+  const [fetching, setFetching] = useState(false);
+  const [activeMenu, setActiveMenu] = useState(null);
+
+  async function fetchIngredients() {
+    setFetching(true);
+    try {
+      setAllIngredients(await getIngredients());
+      setFetching(false);
+    } catch {
+      setError("Failed to load ingredients.");
+      setFetching(false);
+    }
+  }
 
   useEffect(() => {
-    getIngredients()
-      .then(setAllIngredients)
-      .catch(() => setError("Failed to load ingredients."));
+    fetchIngredients();
   }, []);
 
   useEffect(() => {
@@ -35,10 +192,12 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       setIngredients(
         (initialData.ingredients || []).map((ri) => ({
           ingredientId: ri.ingredient ? ri.ingredient.id : "",
+          ingredientName: ri.ingredient ? ri.ingredient.name : "",
+          inputValue: ri.ingredient ? ri.ingredient.name : "",
           quantity: ri.quantity || "",
           unit: ri.unit || UNIT_OPTIONS[0],
           note: ri.note || "",
-          id: ri.id || Math.random(), // for stable keys if available
+          id: ri.id || Math.random(),
         }))
       );
     } else {
@@ -49,30 +208,78 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     setError();
   }, [initialData]);
 
-  function handleAddIngredient() {
-    setIngredients([
-      ...ingredients,
+  const handleAddIngredient = useCallback(() => {
+    setIngredients((prev) => [
+      ...prev,
       {
         ingredientId: "",
+        ingredientName: "",
+        inputValue: "",
         quantity: "",
         unit: UNIT_OPTIONS[0],
         note: "",
         id: Math.random(),
       },
     ]);
-  }
+  }, []);
 
-  function handleIngredientFieldChange(idx, field, value) {
-    setIngredients(
-      ingredients.map((row, i) =>
-        i === idx ? { ...row, [field]: value } : row
-      )
+  const updateIngredientRow = useCallback((idx, newFields) => {
+    setIngredients((rows) =>
+      rows.map((row, i) => (i === idx ? { ...row, ...newFields } : row))
     );
-  }
+  }, []);
 
-  function handleRemoveIngredient(idx) {
-    setIngredients(ingredients.filter((_, i) => i !== idx));
-  }
+  const handleRemoveIngredient = useCallback((idx) => {
+    setIngredients((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  const handleIngredientInputChange = useCallback(
+    (idx, value) => {
+      updateIngredientRow(idx, {
+        inputValue: value,
+        ingredientId: "",
+        ingredientName: value,
+      });
+    },
+    [updateIngredientRow]
+  );
+
+  const handleIngredientSelect = useCallback(
+    (idx, ingredient) => {
+      updateIngredientRow(idx, {
+        ingredientId: ingredient.id,
+        ingredientName: ingredient.name,
+        inputValue: ingredient.name,
+      });
+      setActiveMenu(null);
+    },
+    [updateIngredientRow]
+  );
+
+  const handleAddNewIngredient = useCallback(
+    async (idx, name) => {
+      try {
+        const created = await createIngredient({ name: name.trim() });
+        await fetchIngredients();
+        updateIngredientRow(idx, {
+          ingredientId: created.id,
+          ingredientName: created.name,
+          inputValue: created.name,
+        });
+        setActiveMenu(null);
+      } catch (e) {
+        let msg = "Failed to add new ingredient.";
+        if (e.response?.data) {
+          msg =
+            typeof e.response.data === "string"
+              ? e.response.data
+              : e.response.data.message || msg;
+        }
+        setError(msg);
+      }
+    },
+    [updateIngredientRow]
+  );
 
   function handleFormSubmit(e) {
     e.preventDefault();
@@ -97,7 +304,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       return;
     }
     setError();
-    // Build payload with per-row units
+
     onSubmit({
       ...initialData,
       name: name.trim(),
@@ -165,27 +372,18 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
           </thead>
           <tbody>
             {ingredients.map((row, idx) => (
-              <tr key={row.id || idx}>
+              <tr key={row.id}>
                 <td>
-                  <select
-                    required
-                    className="border border-gray-300 rounded px-2 py-1"
-                    value={row.ingredientId}
-                    onChange={(e) =>
-                      handleIngredientFieldChange(
-                        idx,
-                        "ingredientId",
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option value="">Select</option>
-                    {allIngredients.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.name}
-                      </option>
-                    ))}
-                  </select>
+                  <AutocompleteInput
+                    row={row}
+                    idx={idx}
+                    onInputChange={handleIngredientInputChange}
+                    onIngredientSelect={handleIngredientSelect}
+                    onAddNewIngredient={handleAddNewIngredient}
+                    allIngredients={allIngredients}
+                    activeMenu={activeMenu}
+                    setActiveMenu={setActiveMenu}
+                  />
                 </td>
                 <td>
                   <input
@@ -196,11 +394,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
                     className="border border-gray-300 rounded px-2 py-1 w-20"
                     value={row.quantity}
                     onChange={(e) =>
-                      handleIngredientFieldChange(
-                        idx,
-                        "quantity",
-                        e.target.value
-                      )
+                      updateIngredientRow(idx, { quantity: e.target.value })
                     }
                   />
                 </td>
@@ -210,7 +404,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
                     className="border border-gray-300 rounded px-2 py-1"
                     value={row.unit}
                     onChange={(e) =>
-                      handleIngredientFieldChange(idx, "unit", e.target.value)
+                      updateIngredientRow(idx, { unit: e.target.value })
                     }
                   >
                     {UNIT_OPTIONS.map((unit) => (
@@ -226,7 +420,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
                     className="border border-gray-300 rounded px-2 py-1"
                     value={row.note}
                     onChange={(e) =>
-                      handleIngredientFieldChange(idx, "note", e.target.value)
+                      updateIngredientRow(idx, { note: e.target.value })
                     }
                   />
                 </td>
