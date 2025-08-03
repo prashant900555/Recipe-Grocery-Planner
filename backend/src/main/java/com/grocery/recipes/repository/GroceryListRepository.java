@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
 
+@Deprecated
 public interface GroceryListRepository extends JpaRepository<GroceryList, Long> {
     // Find a GroceryListEntry by its id
     @Query("SELECT e FROM GroceryListEntry e WHERE e.id = :entryId")

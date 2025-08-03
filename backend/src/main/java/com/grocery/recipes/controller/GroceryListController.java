@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Deprecated
 @RestController
 @RequestMapping("/api/grocerylists")
 @CrossOrigin(origins = "*")

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+@Deprecated
 @Service
 public class GroceryListServiceImpl implements GroceryListService {
 
