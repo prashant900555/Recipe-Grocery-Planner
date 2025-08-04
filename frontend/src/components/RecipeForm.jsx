@@ -46,7 +46,7 @@ const AutocompleteInput = memo(
     const [cursorPosition, setCursorPosition] = useState(0);
 
     useLayoutEffect(() => {
-      if (inputRef.current && document.activeElement === inputRef.current) {
+      if (inputRef.current === document.activeElement && inputRef.current) {
         inputRef.current.setSelectionRange(cursorPosition, cursorPosition);
       }
     }, [row.inputValue, cursorPosition]);
@@ -73,6 +73,7 @@ const AutocompleteInput = memo(
         if (e.key === "Enter") {
           e.preventDefault();
           if (!row.inputValue?.trim()) return;
+
           const exactMatch = allIngredients.find(
             (i) =>
               i.name.trim().toLowerCase() ===
@@ -109,6 +110,7 @@ const AutocompleteInput = memo(
     const options = row.inputValue
       ? allIngredients.filter((i) => i.name.toLowerCase().includes(lcInput))
       : [];
+
     const exactMatch = allIngredients.some(
       (i) => i.name.trim().toLowerCase() === lcInput
     );
@@ -126,7 +128,7 @@ const AutocompleteInput = memo(
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           autoComplete="off"
-          spellCheck={false}
+          spellCheck="false"
         />
         {activeMenu === idx && !!row.inputValue?.trim() && (
           <ul
@@ -153,7 +155,7 @@ const AutocompleteInput = memo(
                   handleAddNewClick();
                 }}
               >
-                + Add new ingredient: <b>{row.inputValue}</b>
+                Add new ingredient <b>{row.inputValue}</b>
               </li>
             )}
           </ul>
@@ -169,7 +171,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
   const [servings, setServings] = useState("");
   const [ingredients, setIngredients] = useState([]);
   const [allIngredients, setAllIngredients] = useState([]);
-  const [error, setError] = useState();
+  const [error, setError] = useState("");
   const [fetching, setFetching] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
 
@@ -206,9 +208,9 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         })
       );
 
-      setName(initialData.name || "");
-      setDescription(initialData.description || "");
-      setServings(String(initialData.servings || ""));
+      setName(initialData.name);
+      setDescription(initialData.description);
+      setServings(String(initialData.servings));
       setIngredients(
         (initialData.ingredients || []).map((ri) => ({
           ingredientId: ri.ingredient ? ri.ingredient.id : "",
@@ -228,7 +230,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       setServings("");
       setIngredients([]);
     }
-    setError();
+    setError("");
   }, [initialData]);
 
   // --- handlers for ingredient manipulation remain same as before ---
@@ -318,7 +320,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     const newServings = e.target.value;
     setServings(newServings);
 
-    // Only scale if editing (not when adding), and initialData.id exists
+    // Only scale if editing (not when adding, and initialData.id exists)
     if (initialData && initialData.id) {
       const factor =
         originalServings.current && Number(originalServings.current) > 0
@@ -329,7 +331,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
           ingredientId: orig.ingredient ? orig.ingredient.id : "",
           ingredientName: orig.ingredient ? orig.ingredient.name : "",
           inputValue: orig.ingredient ? orig.ingredient.name : "",
-          quantity: (Number(orig.quantity) * factor).toFixed(2),
+          quantity: Number(orig.quantity * factor).toFixed(2),
           unit: orig.unit || UNIT_OPTIONS[0],
           note: orig.note || "",
           id: orig.id || Math.random(),
@@ -346,16 +348,22 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       setError("Recipe name is required.");
       return;
     }
+
     const servingsValue = parseInt(servings) || 0;
     if (servingsValue < 1 || servingsValue > 100) {
       setError("Servings must be between 1 and 100.");
       return;
     }
+
     if (
       ingredients.length === 0 ||
       ingredients.some(
         (row) =>
-          !row.ingredientId ||
+          // Modified validation: Allow ingredients with name but no ID (new ingredients)
+          !(
+            row.ingredientId ||
+            (row.ingredientName && row.ingredientName.trim())
+          ) ||
           !row.unit ||
           !row.quantity ||
           isNaN(Number(row.quantity)) ||
@@ -367,7 +375,8 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       );
       return;
     }
-    setError();
+
+    setError("");
 
     onSubmit({
       ...initialData,
@@ -377,7 +386,11 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       ingredients: ingredients.map((row) => ({
         ingredient: allIngredients.find(
           (a) => String(a.id) === String(row.ingredientId)
-        ),
+        ) || {
+          // For new ingredients without ID, create a temporary object with the name
+          id: null,
+          name: row.ingredientName,
+        },
         quantity: Number(row.quantity),
         unit: row.unit,
         note: row.note,
@@ -411,134 +424,136 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
           className="w-full border border-blue-300 rounded px-3 py-2"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          rows={2}
+          rows="2"
         />
       </div>
       <div>
-        <label className="block mb-1 font-semibold text-blue-700">
-          Servings
-        </label>
-        <input
-          type="number"
-          min="1"
-          max="100"
-          className="border border-blue-300 rounded px-3 py-2 w-24"
-          value={servings}
-          required
-          onChange={handleServingsChange}
-        />
-      </div>
-      <div>
-        <div className="flex justify-between items-center mb-2">
-          <label className="font-semibold text-blue-700">Ingredients</label>
+        <div>
+          <label className="block mb-1 font-semibold text-blue-700">
+            Servings
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="100"
+            className="border border-blue-300 rounded px-3 py-2 w-24"
+            value={servings}
+            required
+            onChange={handleServingsChange}
+          />
+        </div>
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="font-semibold text-blue-700">Ingredients</label>
+            <button
+              type="button"
+              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              onClick={handleAddIngredient}
+            >
+              Add Ingredient
+            </button>
+          </div>
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr>
+                <th className="px-2 py-1">Ingredient</th>
+                <th className="px-2 py-1">Quantity</th>
+                <th className="px-2 py-1">Unit</th>
+                <th className="px-2 py-1">Note</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {ingredients.map((row, idx) => (
+                <tr key={row.id}>
+                  <td>
+                    <AutocompleteInput
+                      row={row}
+                      idx={idx}
+                      onInputChange={handleIngredientInputChange}
+                      onIngredientSelect={handleIngredientSelect}
+                      onAddNewIngredient={handleAddNewIngredient}
+                      allIngredients={allIngredients}
+                      activeMenu={activeMenu}
+                      setActiveMenu={setActiveMenu}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      required
+                      className="border border-gray-300 rounded px-2 py-1 w-20"
+                      value={row.quantity}
+                      onChange={(e) =>
+                        updateIngredientRow(idx, { quantity: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <select
+                      required
+                      className="border border-gray-300 rounded px-2 py-1"
+                      value={row.unit}
+                      onChange={(e) =>
+                        updateIngredientRow(idx, { unit: e.target.value })
+                      }
+                    >
+                      {UNIT_OPTIONS.map((unit) => (
+                        <option key={unit} value={unit}>
+                          {unit}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      className="border border-gray-300 rounded px-2 py-1"
+                      value={row.note}
+                      onChange={(e) =>
+                        updateIngredientRow(idx, { note: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="text-red-600 px-2"
+                      title="Remove"
+                      onClick={() => handleRemoveIngredient(idx)}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {error && (
+                <tr>
+                  <td colSpan="5" className="text-red-600 text-sm">
+                    {error}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex gap-4 justify-end items-center mt-6">
           <button
             type="button"
-            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-            onClick={handleAddIngredient}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            onClick={onCancel}
           >
-            Add Ingredient
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-green-700 text-white rounded"
+          >
+            Save Recipe
           </button>
         </div>
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead>
-            <tr>
-              <th className="px-2 py-1">Ingredient</th>
-              <th className="px-2 py-1">Quantity</th>
-              <th className="px-2 py-1">Unit</th>
-              <th className="px-2 py-1">Note</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {ingredients.map((row, idx) => (
-              <tr key={row.id}>
-                <td>
-                  <AutocompleteInput
-                    row={row}
-                    idx={idx}
-                    onInputChange={handleIngredientInputChange}
-                    onIngredientSelect={handleIngredientSelect}
-                    onAddNewIngredient={handleAddNewIngredient}
-                    allIngredients={allIngredients}
-                    activeMenu={activeMenu}
-                    setActiveMenu={setActiveMenu}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    required
-                    className="border border-gray-300 rounded px-2 py-1 w-20"
-                    value={row.quantity}
-                    onChange={(e) =>
-                      updateIngredientRow(idx, { quantity: e.target.value })
-                    }
-                  />
-                </td>
-                <td>
-                  <select
-                    required
-                    className="border border-gray-300 rounded px-2 py-1"
-                    value={row.unit}
-                    onChange={(e) =>
-                      updateIngredientRow(idx, { unit: e.target.value })
-                    }
-                  >
-                    {UNIT_OPTIONS.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    className="border border-gray-300 rounded px-2 py-1"
-                    value={row.note}
-                    onChange={(e) =>
-                      updateIngredientRow(idx, { note: e.target.value })
-                    }
-                  />
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="text-red-600 px-2"
-                    title="Remove"
-                    onClick={() => handleRemoveIngredient(idx)}
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {error && (
-              <tr>
-                <td colSpan={5} className="text-red-600 text-sm">
-                  {error}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex gap-4 justify-end items-center mt-6">
-        <button
-          type="button"
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-          onClick={onCancel}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 bg-green-700 text-white rounded"
-        >
-          Save Recipe
-        </button>
       </div>
     </form>
   );
