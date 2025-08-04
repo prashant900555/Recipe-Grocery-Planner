@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   getRecipes,
   createRecipe,
@@ -27,20 +27,13 @@ function debounce(func, wait) {
 const convertUnits = (quantity, unit) => {
   const num = parseFloat(quantity);
   if (isNaN(num) || num === 0) return `${quantity} ${unit}`;
-
-  // Weight conversions
   if (unit === "g" && num >= 1000) return `${(num / 1000).toFixed(2)} kg`;
   if (unit === "kg" && num < 1) return `${(num * 1000).toFixed(2)} g`;
-
-  // Volume conversions
   if (unit === "ml" && num >= 1000) return `${(num / 1000).toFixed(2)} l`;
   if (unit === "l" && num < 1) return `${(num * 1000).toFixed(2)} ml`;
-
-  // Other conversions
   if (unit === "oz" && num >= 16) return `${(num / 16).toFixed(2)} lb`;
   if (unit === "tsp" && num >= 3) return `${(num / 3).toFixed(2)} tbsp`;
   if (unit === "tbsp" && num >= 16) return `${(num / 16).toFixed(2)} cup`;
-
   return `${num.toFixed(2)} ${unit}`;
 };
 
@@ -52,7 +45,10 @@ export default function RecipesPage() {
   const [error, setError] = useState();
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
-  const [servingsUpdateQueue, setServingsUpdateQueue] = useState({}); // Track pending updates
+  const [servingsUpdateQueue, setServingsUpdateQueue] = useState({});
+  const [searchTerm, setSearchTerm] = useState(""); // new
+  const [filteredRecipes, setFilteredRecipes] = useState([]); // new
+  const searchRef = useRef(""); // for debounced search handler
   const navigate = useNavigate();
 
   const fetchAllRecipes = async () => {
@@ -73,38 +69,49 @@ export default function RecipesPage() {
     debounce(async (recipeId, servings) => {
       try {
         await updateRecipeServings(recipeId, servings);
-
-        // Refresh recipes to get updated quantities from database
         await fetchAllRecipes();
-
-        // Remove from pending updates queue
         setServingsUpdateQueue((prev) => {
           const newQueue = { ...prev };
           delete newQueue[recipeId];
           return newQueue;
         });
-
-        console.log(
-          `Successfully updated servings and quantities for recipe ${recipeId} to ${servings}`
-        );
       } catch (error) {
-        console.error("Failed to update servings:", error);
         setError(`Failed to save servings update for recipe ${recipeId}`);
-
-        // Remove from pending updates queue on error too
         setServingsUpdateQueue((prev) => {
           const newQueue = { ...prev };
           delete newQueue[recipeId];
           return newQueue;
         });
       }
-    }, 2000), // 2-second delay
+    }, 2000),
     []
   );
 
   useEffect(() => {
     fetchAllRecipes();
   }, []);
+
+  // Debounced search: filter recipes by name
+  const debouncedSearch = useCallback(
+    debounce((term, recipesData) => {
+      const f = !term
+        ? recipesData
+        : recipesData.filter((r) =>
+            r.name.toLowerCase().includes(term.toLowerCase())
+          );
+      setFilteredRecipes(f);
+    }, 250),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchTerm, recipes);
+  }, [searchTerm, recipes, debouncedSearch]);
+
+  // also keep the filtered list in sync on first mount
+  useEffect(() => {
+    setFilteredRecipes(recipes);
+  }, [recipes]);
 
   async function handleCreate(data) {
     try {
@@ -143,16 +150,29 @@ export default function RecipesPage() {
     );
   }
 
+  // Select all filtered/visible recipes
+  function toggleSelectAll() {
+    if (
+      filteredRecipes.every((r) => selected.includes(r.id)) &&
+      filteredRecipes.length > 0
+    ) {
+      setSelected((prev) =>
+        prev.filter((id) => !filteredRecipes.some((r) => r.id === id))
+      );
+    } else {
+      setSelected((prev) => [
+        ...prev,
+        ...filteredRecipes.map((r) => r.id).filter((id) => !prev.includes(id)),
+      ]);
+    }
+  }
+
   function handleServingsChange(recipeId, newServings) {
     const parsedServings = parseInt(newServings) || 1;
-
-    // Track pending update
     setServingsUpdateQueue((prev) => ({
       ...prev,
       [recipeId]: parsedServings,
     }));
-
-    // Debounced backend update (this will scale quantities in database)
     debouncedUpdateServings(recipeId, parsedServings);
   }
 
@@ -164,7 +184,6 @@ export default function RecipesPage() {
     setGenerating(true);
     setError();
     try {
-      // Use today's date in DD-MM-YYYY
       const dateStr = todayDDMMYYYY();
       const firstId = selected[0];
       const dynamicName = `Recipe_${dateStr}_${firstId}`;
@@ -193,6 +212,21 @@ export default function RecipesPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
+  // Row click selection: do not trigger on ingredient or action cells
+  function handleRowClick(rec, evt) {
+    // Prevent if clicking inside ingredient table or actions cell
+    if (
+      evt.target.closest(".ingredients-cell") ||
+      evt.target.closest(".actions-cell") ||
+      evt.target.tagName === "INPUT" ||
+      evt.target.tagName === "BUTTON" ||
+      evt.target.tagName === "SELECT"
+    )
+      return;
+    toggleSelect(rec.id);
+  }
+
+  // UI
   return (
     <section className="max-w-6xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
       <button
@@ -213,6 +247,16 @@ export default function RecipesPage() {
         >
           Add Recipe
         </button>
+      </div>
+      {/* SEARCH BAR */}
+      <div className="flex mb-4">
+        <input
+          type="text"
+          className="w-full border border-gray-300 rounded px-3 py-2 text-base mr-2"
+          placeholder="Search recipe name…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
       {error && (
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -248,7 +292,18 @@ export default function RecipesPage() {
         <table className="min-w-full divide-y divide-gray-200 text-sm rounded-md">
           <thead className="bg-gray-100">
             <tr>
-              <th className="py-3 px-4 text-left font-bold">Select</th>
+              <th className="py-3 px-4 text-left font-bold">
+                <input
+                  type="checkbox"
+                  checked={
+                    filteredRecipes.length > 0 &&
+                    filteredRecipes.every((r) => selected.includes(r.id))
+                  }
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  title="Select all"
+                />
+              </th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Description</th>
               <th className="py-3 px-4 text-left font-bold">Servings</th>
@@ -263,7 +318,7 @@ export default function RecipesPage() {
                   Loading...
                 </td>
               </tr>
-            ) : recipes.length === 0 ? (
+            ) : filteredRecipes.length === 0 ? (
               <tr>
                 <td
                   colSpan={6}
@@ -273,18 +328,23 @@ export default function RecipesPage() {
                 </td>
               </tr>
             ) : (
-              recipes.map((rec, idx) => {
+              filteredRecipes.map((rec, idx) => {
                 const hasPendingUpdate = servingsUpdateQueue[rec.id];
                 const displayServings = hasPendingUpdate || rec.servings || 1;
-
                 return (
-                  <tr key={rec.id} className="hover:bg-blue-50 transition">
+                  <tr
+                    key={rec.id}
+                    className="hover:bg-blue-50 transition"
+                    onClick={(evt) => handleRowClick(rec, evt)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <td className="py-2 px-4">
                       <input
                         type="checkbox"
                         checked={selected.includes(rec.id)}
                         onChange={() => toggleSelect(rec.id)}
                         className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        onClick={(evt) => evt.stopPropagation()}
                       />
                     </td>
                     <td className="py-2 px-4 capitalize font-medium">
@@ -310,12 +370,13 @@ export default function RecipesPage() {
                             ? "Updating quantities..."
                             : "Change servings"
                         }
+                        onClick={(evt) => evt.stopPropagation()}
                       />
                       {hasPendingUpdate && (
                         <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
                       )}
                     </td>
-                    <td className="py-2 px-4">
+                    <td className="py-2 px-4 ingredients-cell">
                       {rec.ingredients && rec.ingredients.length > 0 ? (
                         <div className="space-y-2">
                           <table className="min-w-full text-xs border border-gray-200 rounded">
@@ -372,10 +433,11 @@ export default function RecipesPage() {
                         <span className="text-gray-400">No ingredients</span>
                       )}
                     </td>
-                    <td className="py-2 px-4 flex gap-2">
+                    <td className="py-2 px-4 flex gap-2 actions-cell">
                       <button
                         className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                        onClick={() => {
+                        onClick={(evt) => {
+                          evt.stopPropagation();
                           setEditRecipe(rec);
                           setShowForm(true);
                         }}
@@ -384,7 +446,10 @@ export default function RecipesPage() {
                       </button>
                       <button
                         className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-700"
-                        onClick={() => handleDelete(rec.id)}
+                        onClick={(evt) => {
+                          evt.stopPropagation();
+                          handleDelete(rec.id);
+                        }}
                       >
                         Delete
                       </button>
