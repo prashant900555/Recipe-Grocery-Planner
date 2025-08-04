@@ -351,7 +351,9 @@ export default function RecipesPage() {
           onClick={handleSetAllDefaultServings}
           disabled={settingDefaultServings}
         >
-          {settingDefaultServings ? "Setting..." : "Set All to 2 Servings"}
+          {settingDefaultServings
+            ? "Setting..."
+            : "Set All to Default Servings"}
         </button>
       </div>
       {showForm && (

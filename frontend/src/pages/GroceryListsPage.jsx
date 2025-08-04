@@ -16,6 +16,7 @@ function extractDate(str) {
   const match = str.match(/\d{2}-\d{2}-\d{4}/);
   return match ? match[0] : str;
 }
+
 const ALL_UNITS = [
   "g",
   "kg",
@@ -34,18 +35,20 @@ const ALL_UNITS = [
   "pack",
   "box",
 ];
+
 function autoConvertUnit(quantity, unit) {
   let num = parseFloat(quantity);
   let u = unit;
-  if (u === "g" && num >= 1000) return [+(num / 1000).toFixed(2), "kg"];
-  if (u === "kg" && num < 1) return [+(num * 1000).toFixed(2), "g"];
-  if (u === "ml" && num >= 1000) return [+(num / 1000).toFixed(2), "l"];
-  if (u === "l" && num < 1) return [+(num * 1000).toFixed(2), "ml"];
-  if (u === "oz" && num >= 16) return [+(num / 16).toFixed(2), "lb"];
-  if (u === "tsp" && num >= 3) return [+(num / 3).toFixed(2), "tbsp"];
-  if (u === "tbsp" && num >= 16) return [+(num / 16).toFixed(2), "cup"];
-  return [isNaN(num) ? "" : +num.toFixed(2), u];
+  if (u === "g" && num >= 1000) return [(num / 1000).toFixed(2), "kg"];
+  if (u === "kg" && num < 1) return [(num * 1000).toFixed(2), "g"];
+  if (u === "ml" && num >= 1000) return [(num / 1000).toFixed(2), "l"];
+  if (u === "l" && num < 1) return [(num * 1000).toFixed(2), "ml"];
+  if (u === "oz" && num >= 16) return [(num / 16).toFixed(2), "lb"];
+  if (u === "tsp" && num >= 3) return [(num / 3).toFixed(2), "tbsp"];
+  if (u === "tbsp" && num >= 16) return [(num / 16).toFixed(2), "cup"];
+  return [isNaN(num) ? "" : num.toFixed(2), u];
 }
+
 function todayAsDDMMYYYY() {
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, "0");
@@ -53,6 +56,7 @@ function todayAsDDMMYYYY() {
   const yyyy = now.getFullYear();
   return `${dd}-${mm}-${yyyy}`;
 }
+
 const initialNewItem = {
   itemName: "",
   quantity: 1,
@@ -76,6 +80,9 @@ export default function GroceryListsPage() {
   const [justUnpurchasedIds, setJustUnpurchasedIds] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [ingredientSuggestions, setIngredientSuggestions] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredActiveItems, setFilteredActiveItems] = useState([]);
+  const [filteredPurchasedItems, setFilteredPurchasedItems] = useState([]);
   const navigate = useNavigate();
 
   async function fetchAll(unpurchasedIds = []) {
@@ -116,6 +123,18 @@ export default function GroceryListsPage() {
       .catch(() => setIngredients([]));
   }, []);
 
+  // Filter items based on search term
+  useEffect(() => {
+    const filterItems = (items) => {
+      if (!searchTerm) return items;
+      return items.filter((item) =>
+        item.itemName.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    };
+    setFilteredActiveItems(filterItems(activeItems));
+    setFilteredPurchasedItems(filterItems(purchasedItems));
+  }, [searchTerm, activeItems, purchasedItems]);
+
   function resetForm() {
     setAdding(false);
     setEditingId(null);
@@ -137,6 +156,7 @@ export default function GroceryListsPage() {
       setIngredientSuggestions([]);
     }
   }
+
   function handleSuggestionClick(name) {
     setNewItem({ ...newItem, itemName: name });
     setIngredientSuggestions([]);
@@ -161,6 +181,7 @@ export default function GroceryListsPage() {
       setError("Failed to add item.");
     }
   }
+
   async function handleEditSave() {
     if (!editItem.itemName.trim()) {
       setError("Item name is required.");
@@ -168,15 +189,20 @@ export default function GroceryListsPage() {
     }
     try {
       const [qty, unit] = autoConvertUnit(editItem.quantity, editItem.unit);
-      await updateItem(editingId, { ...editItem, quantity: qty, unit: unit });
+      await updateItem(editingId, {
+        ...editItem,
+        quantity: qty,
+        unit: unit,
+      });
       resetForm();
       fetchAll();
     } catch {
       setError("Failed to update item.");
     }
   }
+
   async function handleDelete(id) {
-    if (!window.confirm("Are you sure you want to delete this item?")) return;
+    if (!window.confirm("Delete this item?")) return;
     try {
       await deleteItem(id);
       fetchAll();
@@ -184,52 +210,41 @@ export default function GroceryListsPage() {
       setError("Failed to delete item.");
     }
   }
+
   async function handleDeleteSelected(type) {
     const ids = type === "active" ? selectedIds : selectedPurchasedIds;
-    if (!ids.length) return;
-    if (!window.confirm("Are you sure you want to delete the selected items?"))
+    if (!ids.length) {
+      setError(`Select ${type} items to delete.`);
       return;
-    setLoading(true);
-    setError("");
+    }
+    if (!window.confirm(`Delete selected ${type} items?`)) return;
     try {
       for (const id of ids) {
         await deleteItem(id);
       }
-      if (type === "active") setSelectedIds([]);
-      if (type === "purchased") setSelectedPurchasedIds([]);
+      type === "active" ? setSelectedIds([]) : setSelectedPurchasedIds([]);
       fetchAll();
     } catch {
-      setError("Failed to delete selected items.");
-    } finally {
-      setLoading(false);
+      setError(`Failed to delete ${type} items.`);
     }
   }
-  async function handleDeleteAll(section) {
-    let items = section === "active" ? activeItems : purchasedItems;
+
+  async function handleDeleteAll(type) {
+    const items = type === "active" ? activeItems : purchasedItems;
     if (!items.length) return;
-    if (
-      !window.confirm(
-        `Are you sure you want to delete ALL ${
-          section === "active" ? "active" : "purchased"
-        } items? This cannot be undone.`
-      )
-    )
-      return;
-    setLoading(true);
-    setError("");
+    if (!window.confirm(`Delete all ${type} items?`)) return;
     try {
       for (const item of items) {
         await deleteItem(item.id);
       }
-      if (section === "active") setSelectedIds([]);
-      if (section === "purchased") setSelectedPurchasedIds([]);
       fetchAll();
     } catch {
-      setError("Failed to delete all items.");
+      setError(`Failed to delete all ${type} items.`);
     } finally {
       setLoading(false);
     }
   }
+
   async function handleMarkPurchased() {
     if (!selectedIds.length) {
       setError("Select items to mark as purchased.");
@@ -243,6 +258,7 @@ export default function GroceryListsPage() {
       setError("Failed to mark as purchased.");
     }
   }
+
   async function handleUndoPurchased() {
     if (!selectedPurchasedIds.length) {
       setError("Select items to undo purchased.");
@@ -258,6 +274,53 @@ export default function GroceryListsPage() {
       setJustUnpurchasedIds([]);
     }
   }
+
+  // Toggle select all for active items
+  function toggleSelectAllActive() {
+    if (
+      filteredActiveItems.every((item) => selectedIds.includes(item.id)) &&
+      filteredActiveItems.length > 0
+    ) {
+      // Deselect all filtered items
+      setSelectedIds((prev) =>
+        prev.filter((id) => !filteredActiveItems.some((item) => item.id === id))
+      );
+    } else {
+      // Select all filtered items that aren't already selected
+      setSelectedIds((prev) => [
+        ...prev,
+        ...filteredActiveItems
+          .map((item) => item.id)
+          .filter((id) => !prev.includes(id)),
+      ]);
+    }
+  }
+
+  // Toggle select all for purchased items
+  function toggleSelectAllPurchased() {
+    if (
+      filteredPurchasedItems.every((item) =>
+        selectedPurchasedIds.includes(item.id)
+      ) &&
+      filteredPurchasedItems.length > 0
+    ) {
+      // Deselect all filtered items
+      setSelectedPurchasedIds((prev) =>
+        prev.filter(
+          (id) => !filteredPurchasedItems.some((item) => item.id === id)
+        )
+      );
+    } else {
+      // Select all filtered items that aren't already selected
+      setSelectedPurchasedIds((prev) => [
+        ...prev,
+        ...filteredPurchasedItems
+          .map((item) => item.id)
+          .filter((id) => !prev.includes(id)),
+      ]);
+    }
+  }
+
   function renderTable(items, selected, setSelected, purchased = false) {
     return (
       <>
@@ -275,7 +338,20 @@ export default function GroceryListsPage() {
         <table className="min-w-full rounded-md text-sm">
           <thead className={purchased ? "bg-indigo-50" : "bg-pink-50"}>
             <tr>
-              <th></th>
+              <th className="py-3 px-3 text-left font-bold">
+                <input
+                  type="checkbox"
+                  checked={
+                    items.length > 0 &&
+                    items.every((item) => selected.includes(item.id))
+                  }
+                  onChange={
+                    purchased ? toggleSelectAllPurchased : toggleSelectAllActive
+                  }
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  title="Select all"
+                />
+              </th>
               <th className="py-3 px-3 text-left font-bold">Item</th>
               <th className="py-3 px-3 text-left font-bold">Quantity</th>
               <th className="py-3 px-3 text-left font-bold">Unit</th>
@@ -287,150 +363,137 @@ export default function GroceryListsPage() {
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 && (
+            {items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center text-gray-400 py-8">
+                <td colSpan="7" className="text-center text-gray-400 py-8">
                   {purchased ? "No purchased items." : "No items."}
                 </td>
               </tr>
+            ) : (
+              items.map((item) => (
+                <tr
+                  key={item.id}
+                  className="odd:bg-gray-50 hover:bg-pink-50 transition border-b"
+                >
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(item.id)}
+                      onChange={(e) => {
+                        if (e.target.checked)
+                          setSelected([...selected, item.id]);
+                        else
+                          setSelected(selected.filter((id) => id !== item.id));
+                      }}
+                    />
+                  </td>
+                  <td>
+                    {editingId === item.id ? (
+                      <input
+                        type="text"
+                        className="border p-1 w-28"
+                        value={editItem.itemName}
+                        onChange={(e) =>
+                          setEditItem({ ...editItem, itemName: e.target.value })
+                        }
+                      />
+                    ) : (
+                      item.itemName
+                    )}
+                  </td>
+                  <td>
+                    {editingId === item.id ? (
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        className="border p-1 w-16"
+                        value={editItem.quantity}
+                        onChange={(e) =>
+                          setEditItem({ ...editItem, quantity: e.target.value })
+                        }
+                      />
+                    ) : (
+                      item.quantity
+                    )}
+                  </td>
+                  <td>
+                    {editingId === item.id ? (
+                      <select
+                        className="border p-1 w-16"
+                        value={editItem.unit}
+                        onChange={(e) =>
+                          setEditItem({ ...editItem, unit: e.target.value })
+                        }
+                      >
+                        {ALL_UNITS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      item.unit
+                    )}
+                  </td>
+                  <td>
+                    {editingId === item.id ? (
+                      <input
+                        type="text"
+                        className="border p-1 w-32"
+                        value={editItem.note}
+                        onChange={(e) =>
+                          setEditItem({ ...editItem, note: e.target.value })
+                        }
+                      />
+                    ) : (
+                      item.note || "-"
+                    )}
+                  </td>
+                  <td>
+                    {purchased
+                      ? extractDate(item.datePurchased) || "-"
+                      : extractDate(item.dateAdded) || "-"}
+                  </td>
+                  <td>
+                    {editingId === item.id ? (
+                      <>
+                        <button
+                          className="text-green-600 px-2 hover:underline"
+                          onClick={handleEditSave}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="text-gray-600 px-2 hover:underline"
+                          onClick={resetForm}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="text-blue-600 px-2 hover:underline"
+                          onClick={() => {
+                            setEditingId(item.id);
+                            setEditItem(item);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="text-red-600 px-2 hover:underline"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))
             )}
-            {items.map((item) => (
-              <tr
-                key={item.id}
-                className="odd:bg-gray-50 hover:bg-pink-50 transition border-b"
-              >
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(item.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelected([...selected, item.id]);
-                      else setSelected(selected.filter((id) => id !== item.id));
-                    }}
-                  />
-                </td>
-                <td>
-                  {editingId === item.id ? (
-                    <input
-                      type="text"
-                      className="border p-1 w-28"
-                      value={editItem.itemName}
-                      onChange={(e) =>
-                        setEditItem({ ...editItem, itemName: e.target.value })
-                      }
-                    />
-                  ) : (
-                    item.itemName
-                  )}
-                </td>
-                <td>
-                  {editingId === item.id ? (
-                    <input
-                      type="number"
-                      min={0.01}
-                      step={0.01}
-                      className="border p-1 w-16"
-                      value={editItem.quantity}
-                      onChange={(e) =>
-                        setEditItem({
-                          ...editItem,
-                          quantity: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    item.quantity
-                  )}
-                </td>
-                <td>
-                  {editingId === item.id ? (
-                    <select
-                      className="border p-1 w-16"
-                      value={editItem.unit}
-                      onChange={(e) =>
-                        setEditItem({ ...editItem, unit: e.target.value })
-                      }
-                    >
-                      {ALL_UNITS.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    item.unit
-                  )}
-                </td>
-                <td>
-                  {editingId === item.id ? (
-                    <input
-                      type="text"
-                      className="border p-1 w-32"
-                      value={editItem.note || ""}
-                      onChange={(e) =>
-                        setEditItem({ ...editItem, note: e.target.value })
-                      }
-                    />
-                  ) : (
-                    item.note
-                  )}
-                </td>
-                <td>
-                  {editingId === item.id ? (
-                    <input
-                      type="text"
-                      className="border p-1 w-20"
-                      value={editItem.dateAdded}
-                      onChange={(e) =>
-                        setEditItem({ ...editItem, dateAdded: e.target.value })
-                      }
-                    />
-                  ) : purchased ? (
-                    extractDate(item.datePurchased)
-                  ) : justUnpurchasedIds.includes(item.id) ? (
-                    todayAsDDMMYYYY()
-                  ) : (
-                    extractDate(item.dateAdded)
-                  )}
-                </td>
-                <td className="flex gap-1">
-                  {editingId === item.id ? (
-                    <>
-                      <button
-                        className="bg-green-600 text-white px-2 py-1 rounded"
-                        onClick={handleEditSave}
-                      >
-                        Save
-                      </button>
-                      <button
-                        className="bg-gray-400 text-white px-2 py-1 rounded"
-                        onClick={resetForm}
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        className="bg-blue-600 text-white px-2 py-1 rounded mr-1"
-                        onClick={() => {
-                          setEditingId(item.id);
-                          setEditItem({ ...item });
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="bg-red-600 text-white px-2 py-1 rounded"
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        &#10005;
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
           </tbody>
         </table>
       </>
@@ -444,9 +507,24 @@ export default function GroceryListsPage() {
         className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         onClick={() => navigate("/")}
       >
-        Back to Home
+        ← Back to Home
       </button>
-      <h2 className="text-3xl font-bold text-pink-800 mb-4">Grocery List</h2>
+
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
+        <h2 className="text-3xl font-bold text-pink-800 mb-4">Grocery List</h2>
+      </div>
+
+      {/* SEARCH BAR */}
+      <div className="flex mb-4">
+        <input
+          type="text"
+          className="w-full border border-gray-300 rounded px-3 py-2 text-base mr-2"
+          placeholder="Search grocery items"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       <div className="flex gap-3 mb-6">
         <button
           className={`px-3 py-1 rounded ${
@@ -469,11 +547,13 @@ export default function GroceryListsPage() {
           Purchased
         </button>
       </div>
+
       {error && (
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
+
       {!showPurchased && (
         <div className="mb-6">
           <button
@@ -524,10 +604,11 @@ export default function GroceryListsPage() {
                         key={sug.id}
                         style={{ padding: "4px 8px", cursor: "pointer" }}
                         onClick={() => handleSuggestionClick(sug.name)}
-                        tabIndex={0}
+                        tabIndex="0"
                         onKeyDown={(e) => {
-                          if (e.key === "Enter")
+                          if (e.key === "Enter") {
                             handleSuggestionClick(sug.name);
+                          }
                         }}
                       >
                         {sug.name}
@@ -538,8 +619,8 @@ export default function GroceryListsPage() {
               </div>
               <input
                 type="number"
-                min={0.01}
-                step={0.01}
+                min="0.01"
+                step="0.01"
                 className="border p-1 w-16"
                 placeholder="Qty"
                 value={newItem.quantity}
@@ -583,20 +664,27 @@ export default function GroceryListsPage() {
               </button>
             </div>
           )}
-          <div className="overflow-x-auto">
-            {renderTable(activeItems, selectedIds, setSelectedIds, false)}
-          </div>
-          <button
-            className="mt-4 bg-indigo-700 text-white px-4 py-2 rounded-full"
-            onClick={handleMarkPurchased}
-            disabled={selectedIds.length === 0}
-          >
-            Mark Purchased
-          </button>
+          {filteredActiveItems.length > 0 && (
+            <div className="mb-4">
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded shadow"
+                onClick={handleMarkPurchased}
+                disabled={selectedIds.length === 0}
+              >
+                Mark as Purchased
+              </button>
+            </div>
+          )}
+          {loading ? (
+            <div className="text-center py-8 text-gray-400">Loading...</div>
+          ) : (
+            renderTable(filteredActiveItems, selectedIds, setSelectedIds)
+          )}
         </div>
       )}
+
       {showPurchased && (
-        <div>
+        <div className="mb-6">
           <button
             className="bg-red-700 text-white px-4 py-2 rounded-lg shadow mb-4"
             onClick={() => handleDeleteAll("purchased")}
@@ -605,23 +693,27 @@ export default function GroceryListsPage() {
           >
             Delete All Purchased
           </button>
-          <div className="mb-4">
-            <button
-              className="bg-indigo-700 text-white px-4 py-2 rounded-full"
-              onClick={handleUndoPurchased}
-              disabled={selectedPurchasedIds.length === 0}
-            >
-              Undo Purchased
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            {renderTable(
-              purchasedItems,
+          {filteredPurchasedItems.length > 0 && (
+            <div className="mb-4">
+              <button
+                className="bg-orange-600 text-white px-4 py-2 rounded shadow"
+                onClick={handleUndoPurchased}
+                disabled={selectedPurchasedIds.length === 0}
+              >
+                Undo Purchased
+              </button>
+            </div>
+          )}
+          {loading ? (
+            <div className="text-center py-8 text-gray-400">Loading...</div>
+          ) : (
+            renderTable(
+              filteredPurchasedItems,
               selectedPurchasedIds,
               setSelectedPurchasedIds,
               true
-            )}
-          </div>
+            )
+          )}
         </div>
       )}
     </section>
