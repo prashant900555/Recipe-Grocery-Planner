@@ -10,6 +10,7 @@ import {
   getIngredients,
   createIngredient,
 } from "../services/ingredientService";
+import { debounce } from "lodash-es";
 
 const UNIT_OPTIONS = [
   "g",
@@ -72,13 +73,11 @@ const AutocompleteInput = memo(
         if (e.key === "Enter") {
           e.preventDefault();
           if (!row.inputValue?.trim()) return;
-
           const exactMatch = allIngredients.find(
             (i) =>
               i.name.trim().toLowerCase() ===
               row.inputValue.trim().toLowerCase()
           );
-
           if (exactMatch) {
             onIngredientSelect(idx, exactMatch);
           } else {
@@ -174,6 +173,10 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
   const [fetching, setFetching] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
 
+  // To store initial ingredients and servings as a fixed baseline for scaling
+  const originalIngredients = useRef([]);
+  const originalServings = useRef(1);
+
   async function fetchIngredients() {
     setFetching(true);
     try {
@@ -191,6 +194,18 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
 
   useEffect(() => {
     if (initialData) {
+      // set up the original values for scaling
+      originalServings.current = initialData.servings || 1;
+      originalIngredients.current = (initialData.ingredients || []).map(
+        (ri) => ({
+          quantity: Number(ri.quantity) || 0,
+          unit: ri.unit || UNIT_OPTIONS[0],
+          note: ri.note || "",
+          id: ri.id || Math.random(),
+          ingredient: ri.ingredient || null,
+        })
+      );
+
       setName(initialData.name || "");
       setDescription(initialData.description || "");
       setServings(String(initialData.servings || ""));
@@ -206,6 +221,8 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         }))
       );
     } else {
+      originalServings.current = 1;
+      originalIngredients.current = [];
       setName("");
       setDescription("");
       setServings("");
@@ -214,6 +231,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     setError();
   }, [initialData]);
 
+  // --- handlers for ingredient manipulation remain same as before ---
   const handleAddIngredient = useCallback(() => {
     setIngredients((prev) => [
       ...prev,
@@ -286,6 +304,41 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     },
     [updateIngredientRow]
   );
+
+  // Debounced API call handler (optional, integrate with backend if needed)
+  const debouncedUpdateServings = useCallback(
+    debounce((recipeId, newServings) => {
+      // Optionally update via backend here
+    }, 2000),
+    []
+  );
+
+  // --- This handles auto-scaling of ingredients only on editing an existing recipe ---
+  function handleServingsChange(e) {
+    const newServings = e.target.value;
+    setServings(newServings);
+
+    // Only scale if editing (not when adding), and initialData.id exists
+    if (initialData && initialData.id) {
+      const factor =
+        originalServings.current && Number(originalServings.current) > 0
+          ? Number(newServings) / Number(originalServings.current)
+          : 1;
+      setIngredients(
+        originalIngredients.current.map((orig, idx) => ({
+          ingredientId: orig.ingredient ? orig.ingredient.id : "",
+          ingredientName: orig.ingredient ? orig.ingredient.name : "",
+          inputValue: orig.ingredient ? orig.ingredient.name : "",
+          quantity: (Number(orig.quantity) * factor).toFixed(2),
+          unit: orig.unit || UNIT_OPTIONS[0],
+          note: orig.note || "",
+          id: orig.id || Math.random(),
+        }))
+      );
+      debouncedUpdateServings(initialData.id, newServings);
+    }
+    // No scaling performed if adding a new recipe (initialData.id undefined)
+  }
 
   function handleFormSubmit(e) {
     e.preventDefault();
@@ -372,7 +425,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
           className="border border-blue-300 rounded px-3 py-2 w-24"
           value={servings}
           required
-          onChange={(e) => setServings(e.target.value)}
+          onChange={handleServingsChange}
         />
       </div>
       <div>
