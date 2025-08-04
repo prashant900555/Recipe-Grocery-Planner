@@ -45,8 +45,27 @@ public class RecipeServiceImpl implements RecipeService {
     public Recipe save(Recipe recipe) {
         List<RecipeIngredient> newIngredients = new ArrayList<>();
         for (RecipeIngredient ri : recipe.getIngredients()) {
-            Ingredient dbIng = ingredientRepository.findById(ri.getIngredient().getId())
-                    .orElseThrow(() -> new RuntimeException("Ingredient not found!"));
+            Ingredient dbIng;
+
+            // Check if ingredient has an ID and exists in database
+            if (ri.getIngredient() != null && ri.getIngredient().getId() != null) {
+                Optional<Ingredient> existingIngredient = ingredientRepository.findById(ri.getIngredient().getId());
+                if (existingIngredient.isPresent()) {
+                    // Use existing ingredient from database
+                    dbIng = existingIngredient.get();
+                } else {
+                    // ID provided but not found - create new ingredient
+                    Ingredient newIngredient = new Ingredient();
+                    newIngredient.setName(ri.getIngredient().getName());
+                    dbIng = ingredientRepository.save(newIngredient);
+                }
+            } else {
+                // No ID provided - create new ingredient
+                Ingredient newIngredient = new Ingredient();
+                newIngredient.setName(ri.getIngredient() != null ? ri.getIngredient().getName() : "");
+                dbIng = ingredientRepository.save(newIngredient);
+            }
+
             RecipeIngredient newRI = new RecipeIngredient();
             newRI.setRecipe(recipe); // for bi-directional mapping
             newRI.setIngredient(dbIng); // attach managed entity
@@ -80,7 +99,7 @@ public class RecipeServiceImpl implements RecipeService {
 
         Optional<Recipe> recipeOpt = recipeRepository.findById(id);
         if (recipeOpt.isEmpty()) {
-            throw new IllegalArgumentException("Recipe not found with id: " + id);
+            throw new IllegalArgumentException("Recipe not found with id " + id);
         }
 
         Recipe recipe = recipeOpt.get();
@@ -105,5 +124,4 @@ public class RecipeServiceImpl implements RecipeService {
         // Save the recipe with updated servings and scaled quantities
         recipeRepository.save(recipe);
     }
-
 }
