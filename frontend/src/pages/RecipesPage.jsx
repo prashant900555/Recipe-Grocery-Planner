@@ -5,6 +5,7 @@ import {
   updateRecipe,
   deleteRecipe,
   updateRecipeServings, // NEW import
+  setAllRecipesDefaultServings, // NEW import
 } from "../services/recipeService";
 import { generateFromRecipes } from "../services/groceryListService";
 import RecipeForm from "../components/RecipeForm";
@@ -26,7 +27,7 @@ function debounce(func, wait) {
 // Unit conversion utility functions
 const convertUnits = (quantity, unit) => {
   const num = parseFloat(quantity);
-  if (isNaN(num) || num === 0) return `${quantity} ${unit}`;
+  if (isNaN(num) || num <= 0) return `${quantity} ${unit}`;
   if (unit === "g" && num >= 1000) return `${(num / 1000).toFixed(2)} kg`;
   if (unit === "kg" && num < 1) return `${(num * 1000).toFixed(2)} g`;
   if (unit === "ml" && num >= 1000) return `${(num / 1000).toFixed(2)} l`;
@@ -48,6 +49,7 @@ export default function RecipesPage() {
   const [servingsUpdateQueue, setServingsUpdateQueue] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredRecipes, setFilteredRecipes] = useState([]);
+  const [settingDefaultServings, setSettingDefaultServings] = useState(false); // NEW state
   const searchRef = useRef(); // for debounced search handler
   const navigate = useNavigate();
 
@@ -79,6 +81,7 @@ export default function RecipesPage() {
             )
           );
         }
+
         setServingsUpdateQueue((prev) => {
           const newQueue = { ...prev };
           delete newQueue[recipeId];
@@ -190,11 +193,62 @@ export default function RecipesPage() {
     debouncedUpdateServings(recipeId, parsedServings);
   }
 
+  // NEW: Handle default servings for individual recipe
+  async function handleSetDefaultServings(recipeId) {
+    try {
+      await updateRecipeServings(recipeId, 2);
+      // Update local state
+      const updatedRecipes = await getRecipes();
+      const updatedRecipe = updatedRecipes.find((r) => r.id === recipeId);
+      if (updatedRecipe) {
+        setRecipes((prev) =>
+          prev.map((recipe) =>
+            recipe.id === recipeId ? updatedRecipe : recipe
+          )
+        );
+      }
+    } catch {
+      setError(`Failed to set default servings for recipe ${recipeId}`);
+    }
+  }
+
+  // NEW: Handle global default servings
+  async function handleSetAllDefaultServings() {
+    if (
+      !window.confirm(
+        "Set all recipes to 2 servings? This will update ingredient quantities accordingly."
+      )
+    ) {
+      return;
+    }
+
+    setSettingDefaultServings(true);
+    setError("");
+    try {
+      await setAllRecipesDefaultServings();
+      // Refresh all recipes to get updated data
+      await fetchAllRecipes();
+    } catch (e) {
+      let message = "Failed to set default servings for all recipes.";
+      if (e.response?.data) {
+        if (typeof e.response.data === "string") message = e.response.data;
+        else if (e.response.data.message) message = e.response.data.message;
+        else message = JSON.stringify(e.response.data);
+      } else if (e.message) {
+        message = e.message;
+      }
+      setError(message);
+    } finally {
+      setSettingDefaultServings(false);
+    }
+  }
+
   async function handleGenerateList() {
     if (!selected.length) {
       setError("Select at least one recipe to generate the grocery list.");
       return;
     }
+
     setGenerating(true);
     setError("");
     try {
@@ -249,7 +303,7 @@ export default function RecipesPage() {
         className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         onClick={() => navigate("/")}
       >
-        ← Back to Home
+        Back to Home
       </button>
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
         <h2 className="text-3xl font-bold text-blue-800">Recipes</h2>
@@ -260,7 +314,7 @@ export default function RecipesPage() {
             setEditRecipe(null);
           }}
         >
-          + Add Recipe
+          Add Recipe
         </button>
       </div>
       {/* SEARCH BAR */}
@@ -282,7 +336,7 @@ export default function RecipesPage() {
       {/* Selection and Generate */}
       <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
         <span className="font-semibold mr-2">
-          Select recipes to generate a grocery list:
+          Select recipes to generate a grocery list
         </span>
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
@@ -290,6 +344,14 @@ export default function RecipesPage() {
           disabled={generating || selected.length === 0}
         >
           {generating ? "Generating..." : "Generate Grocery List"}
+        </button>
+        {/* NEW: Global Default Servings Button */}
+        <button
+          className="px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700"
+          onClick={handleSetAllDefaultServings}
+          disabled={settingDefaultServings}
+        >
+          {settingDefaultServings ? "Setting..." : "Set All to 2 Servings"}
         </button>
       </div>
       {showForm && (
@@ -361,37 +423,39 @@ export default function RecipesPage() {
                         checked={selected.includes(rec.id)}
                         onChange={() => toggleSelect(rec.id)}
                         className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        onClick={(evt) => evt.stopPropagation()}
                       />
                     </td>
-                    <td className="py-2 px-4 capitalize font-medium">
+                    <td className="py-2 px-4 font-medium capitalize">
                       {rec.name}
                     </td>
-                    <td className="py-2 px-4">{rec.description}</td>
-                    <td className="py-2 px-4 relative">
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        className={`border border-gray-300 rounded px-2 py-1 w-16 text-center ${
-                          hasPendingUpdate
-                            ? "bg-yellow-50 border-yellow-300"
-                            : ""
-                        }`}
-                        value={displayServings}
-                        onChange={(e) =>
-                          handleServingsChange(rec.id, e.target.value)
-                        }
-                        title={
-                          hasPendingUpdate
-                            ? "Updating quantities..."
-                            : "Change servings"
-                        }
-                        onClick={(evt) => evt.stopPropagation()}
-                      />
-                      {hasPendingUpdate && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                      )}
+                    <td className="py-2 px-4 text-gray-600">
+                      {rec.description || "-"}
+                    </td>
+                    <td className="py-2 px-4">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          className="border border-gray-300 rounded px-2 py-1 w-16 text-sm"
+                          value={displayServings}
+                          onChange={(e) =>
+                            handleServingsChange(rec.id, e.target.value)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        {/* NEW: Individual Default Servings Button */}
+                        <button
+                          className="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetDefaultServings(rec.id);
+                          }}
+                          title="Set to 2 servings"
+                        >
+                          Default
+                        </button>
+                      </div>
                     </td>
                     <td className="py-2 px-4 ingredients-cell">
                       {rec.ingredients && rec.ingredients.length > 0 ? (
@@ -417,7 +481,7 @@ export default function RecipesPage() {
                               {rec.ingredients.map((ri) =>
                                 ri.ingredient ? (
                                   <tr
-                                    key={ri.id || Math.random()}
+                                    key={`${ri.id}-${Math.random()}`}
                                     className="border-t border-gray-100"
                                   >
                                     <td className="px-2 py-1 font-medium">

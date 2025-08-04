@@ -31,3 +31,9 @@ export async function updateRecipeServings(id, servings) {
   const res = await axios.patch(`${API_URL}/${id}/servings`, { servings });
   return res.data;
 }
+
+// NEW: Set all recipes to default servings (2)
+export async function setAllRecipesDefaultServings() {
+  const res = await axios.patch(`${API_URL}/default-servings`, { servings: 2 });
+  return res.data;
+}
