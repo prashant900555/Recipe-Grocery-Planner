@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   getMealPlans,
   createMealPlan,
@@ -9,14 +9,29 @@ import { generateFromMealPlans } from "../services/groceryListService";
 import MealPlanForm from "../components/MealPlanForm";
 import { useNavigate } from "react-router-dom";
 
+// Debounce utility function
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 export default function MealPlansPage() {
   const [mealPlans, setMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editPlan, setEditPlan] = useState(null);
-  const [error, setError] = useState();
+  const [error, setError] = useState("");
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredPlans, setFilteredPlans] = useState([]);
 
   const navigate = useNavigate();
 
@@ -25,7 +40,7 @@ export default function MealPlansPage() {
     setLoading(true);
     try {
       setMealPlans(await getMealPlans());
-      setError();
+      setError("");
     } catch {
       setError("Failed to fetch meal plans.");
     } finally {
@@ -37,6 +52,28 @@ export default function MealPlansPage() {
     fetchAll();
     // eslint-disable-next-line
   }, []);
+
+  // Debounced search - filter plans by name
+  const debouncedSearch = useCallback(
+    debounce((term, plansData) => {
+      const f = !term
+        ? plansData
+        : plansData.filter((p) =>
+            p.name.toLowerCase().includes(term.toLowerCase())
+          );
+      setFilteredPlans(f);
+    }, 250),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchTerm, mealPlans);
+  }, [searchTerm, mealPlans, debouncedSearch]);
+
+  // also keep the filtered list in sync on first mount
+  useEffect(() => {
+    setFilteredPlans(mealPlans);
+  }, [mealPlans]);
 
   async function handleCreate(data) {
     try {
@@ -75,13 +112,30 @@ export default function MealPlansPage() {
     );
   }
 
-  // Generate dynamic name: join plan names with _ then add _{date}_List
+  // Select all filtered/visible meal plans
+  function toggleSelectAll() {
+    if (
+      filteredPlans.every((p) => selected.includes(p.id)) &&
+      filteredPlans.length > 0
+    ) {
+      setSelected((prev) =>
+        prev.filter((id) => !filteredPlans.some((p) => p.id === id))
+      );
+    } else {
+      setSelected((prev) => [
+        ...prev,
+        ...filteredPlans.map((p) => p.id).filter((id) => !prev.includes(id)),
+      ]);
+    }
+  }
+
+  // Generate dynamic name - join plan names with " & " then add date/List
   function dynamicGroceryListName(dateStr) {
     if (!selected.length) return "";
     const plans = mealPlans.filter((mp) => selected.includes(mp.id));
     const names = plans.map((mp) => mp.name || "MealPlan");
-    const joinedName = names.join("_");
-    return `${joinedName}_${dateStr}_List`;
+    const joinedName = names.join(" & ");
+    return `${joinedName}${dateStr}List`;
   }
 
   async function handleGenerate() {
@@ -90,7 +144,7 @@ export default function MealPlansPage() {
       return;
     }
     setGenerating(true);
-    setError();
+    setError("");
     try {
       const todayDate = todayDDMMYYYY();
       const autoName = dynamicGroceryListName(todayDate);
@@ -126,7 +180,7 @@ export default function MealPlansPage() {
         className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         onClick={() => navigate("/")}
       >
-        Back to Home
+        ← Back to Home
       </button>
 
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
@@ -138,9 +192,21 @@ export default function MealPlansPage() {
             setEditPlan(null);
           }}
         >
-          Add Meal Plan
+          + Add Meal Plan
         </button>
       </div>
+
+      {/* SEARCH BAR */}
+      <div className="flex mb-4">
+        <input
+          type="text"
+          className="w-full border border-gray-300 rounded px-3 py-2 text-base mr-2"
+          placeholder="Search meal plan name"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       {error && (
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
@@ -150,7 +216,7 @@ export default function MealPlansPage() {
       {/* Selection and Generate */}
       <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
         <span className="font-semibold mr-2">
-          Select meal plans to generate a grocery list
+          Select meal plans to generate a grocery list:
         </span>
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
@@ -160,7 +226,6 @@ export default function MealPlansPage() {
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
       </div>
-
       {showForm && (
         <div className="mb-10">
           <MealPlanForm
@@ -173,66 +238,75 @@ export default function MealPlansPage() {
           />
         </div>
       )}
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100 text-sm rounded-md">
           <thead className="bg-indigo-50">
             <tr>
-              <th></th>
-              <th className="py-3 px-4 text-left font-bold">#</th>
+              <th className="py-3 px-4 text-left font-bold">
+                <input
+                  type="checkbox"
+                  checked={
+                    filteredPlans.length > 0 &&
+                    filteredPlans.every((p) => selected.includes(p.id))
+                  }
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  title="Select all"
+                />
+              </th>
               <th className="py-3 px-4 text-left font-bold">Name</th>
               <th className="py-3 px-4 text-left font-bold">Created</th>
               <th className="py-3 px-4 text-left font-bold">Days</th>
               <th className="py-3 px-4 text-left font-bold">Meals</th>
-              <th></th>
+              <th className="py-3 px-4 text-left font-bold">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-50">
             {loading ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-400">
+                <td colSpan="6" className="text-center py-8 text-gray-400">
                   Loading...
                 </td>
               </tr>
-            ) : mealPlans.length === 0 ? (
+            ) : filteredPlans.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan="6"
                   className="text-center py-10 text-gray-300 font-semibold"
                 >
                   No meal plans found.
                 </td>
               </tr>
             ) : (
-              mealPlans.map((plan, idx) => (
+              filteredPlans.map((plan, idx) => (
                 <tr key={plan.id} className="hover:bg-indigo-50 transition">
-                  <td>
+                  <td className="py-2 px-4">
                     <input
                       type="checkbox"
                       checked={selected.includes(plan.id)}
                       onChange={() => toggleSelected(plan.id)}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </td>
-                  <td className="py-2 px-4">{idx + 1}</td>
                   <td className="py-2 px-4 capitalize">{plan.name}</td>
                   <td className="py-2 px-4">
                     {plan.createdAt?.slice(0, 10) || "-"}
                   </td>
                   <td className="py-2 px-4">
-                    {
-                      [
-                        ...new Set(
-                          plan.items?.map((i) => (i.date.length ? i.date : ""))
-                        ),
-                      ].length
-                    }
+                    {[
+                      ...new Set(
+                        plan.items?.map((i) => (i.date.length ? i.date : ""))
+                      ),
+                    ].length || 0}
                   </td>
                   <td className="py-2 px-4">
                     {plan.items && plan.items.length > 0 ? (
                       <ul className="list-disc pl-4">
                         {plan.items.map((item) =>
                           item.recipe ? (
-                            <li key={item.id + "-" + item.date}>
-                              {item.date} {item.recipe.name}
+                            <li key={`${item.id}-${item.date}`}>
+                              {item.date} - {item.recipe.name}
                             </li>
                           ) : null
                         )}
