@@ -84,4 +84,22 @@ public class RecipeController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    // NEW: PATCH /api/recipes/default-servings - Sets all recipes to default servings (2)
+    @PatchMapping("/default-servings")
+    @CrossOrigin(origins = "*") // Explicit CORS for this endpoint
+    public ResponseEntity<Void> setAllRecipesDefaultServings(
+            @RequestBody Map<String, Integer> payload) {
+
+        if (!payload.containsKey("servings")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            recipeService.setAllRecipesDefaultServings(payload.get("servings"));
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

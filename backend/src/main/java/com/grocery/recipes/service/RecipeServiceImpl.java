@@ -124,4 +124,12 @@ public class RecipeServiceImpl implements RecipeService {
         // Save the recipe with updated servings and scaled quantities
         recipeRepository.save(recipe);
     }
+
+    @Override
+    public void setAllRecipesDefaultServings(int defaultServings) {
+        List<Recipe> allRecipes = findAll();
+        for (Recipe recipe : allRecipes) {
+            updateServingsAndScaleQuantities(recipe.getId(), defaultServings);
+        }
+    }
 }

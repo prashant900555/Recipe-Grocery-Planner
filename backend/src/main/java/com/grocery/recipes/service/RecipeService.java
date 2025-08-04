@@ -13,4 +13,5 @@ public interface RecipeService {
 
     // NEW: Method for updating servings and scaling ingredient quantities
     void updateServingsAndScaleQuantities(Long id, Integer newServings);
+    void setAllRecipesDefaultServings(int defaultServings);
 }
