@@ -42,13 +42,13 @@ export default function RecipesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editRecipe, setEditRecipe] = useState(null);
-  const [error, setError] = useState();
+  const [error, setError] = useState("");
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [servingsUpdateQueue, setServingsUpdateQueue] = useState({});
-  const [searchTerm, setSearchTerm] = useState(""); // new
-  const [filteredRecipes, setFilteredRecipes] = useState([]); // new
-  const searchRef = useRef(""); // for debounced search handler
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredRecipes, setFilteredRecipes] = useState([]);
+  const searchRef = useRef(); // for debounced search handler
   const navigate = useNavigate();
 
   const fetchAllRecipes = async () => {
@@ -56,7 +56,7 @@ export default function RecipesPage() {
     try {
       const fetchedRecipes = await getRecipes();
       setRecipes(fetchedRecipes);
-      setError();
+      setError("");
     } catch {
       setError("Failed to fetch recipes.");
     } finally {
@@ -69,7 +69,16 @@ export default function RecipesPage() {
     debounce(async (recipeId, servings) => {
       try {
         await updateRecipeServings(recipeId, servings);
-        await fetchAllRecipes();
+        // Fetch updated recipe from backend and update only that recipe in local state
+        const updatedRecipes = await getRecipes();
+        const updatedRecipe = updatedRecipes.find((r) => r.id === recipeId);
+        if (updatedRecipe) {
+          setRecipes((prev) =>
+            prev.map((recipe) =>
+              recipe.id === recipeId ? updatedRecipe : recipe
+            )
+          );
+        }
         setServingsUpdateQueue((prev) => {
           const newQueue = { ...prev };
           delete newQueue[recipeId];
@@ -91,7 +100,7 @@ export default function RecipesPage() {
     fetchAllRecipes();
   }, []);
 
-  // Debounced search: filter recipes by name
+  // Debounced search - filter recipes by name
   const debouncedSearch = useCallback(
     debounce((term, recipesData) => {
       const f = !term
@@ -115,9 +124,10 @@ export default function RecipesPage() {
 
   async function handleCreate(data) {
     try {
-      await createRecipe(data);
+      const newRecipe = await createRecipe(data);
+      // Add new recipe to local state instead of refetching
+      setRecipes((prev) => [...prev, newRecipe]);
       setShowForm(false);
-      fetchAllRecipes();
     } catch {
       setError("Failed to create recipe.");
     }
@@ -125,10 +135,13 @@ export default function RecipesPage() {
 
   async function handleUpdate(data) {
     try {
-      await updateRecipe(data.id, data);
+      const updatedRecipe = await updateRecipe(data.id, data);
+      // Update local state instead of refetching all recipes
+      setRecipes((prev) =>
+        prev.map((recipe) => (recipe.id === data.id ? updatedRecipe : recipe))
+      );
       setShowForm(false);
       setEditRecipe(null);
-      fetchAllRecipes();
     } catch {
       setError("Failed to update recipe.");
     }
@@ -138,7 +151,8 @@ export default function RecipesPage() {
     if (!window.confirm("Delete this recipe?")) return;
     try {
       await deleteRecipe(id);
-      fetchAllRecipes();
+      // Remove from local state instead of refetching
+      setRecipes((prev) => prev.filter((recipe) => recipe.id !== id));
     } catch {
       setError("Failed to delete recipe.");
     }
@@ -182,11 +196,11 @@ export default function RecipesPage() {
       return;
     }
     setGenerating(true);
-    setError();
+    setError("");
     try {
       const dateStr = todayDDMMYYYY();
       const firstId = selected[0];
-      const dynamicName = `Recipe_${dateStr}_${firstId}`;
+      const dynamicName = `Recipe${dateStr}${firstId}`;
       await generateFromRecipes(selected, dynamicName, dateStr);
       setGenerating(false);
       navigate("/grocerylists");
@@ -212,7 +226,7 @@ export default function RecipesPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
-  // Row click selection: do not trigger on ingredient or action cells
+  // Row click selection - do not trigger on ingredient or action cells
   function handleRowClick(rec, evt) {
     // Prevent if clicking inside ingredient table or actions cell
     if (
@@ -221,8 +235,9 @@ export default function RecipesPage() {
       evt.target.tagName === "INPUT" ||
       evt.target.tagName === "BUTTON" ||
       evt.target.tagName === "SELECT"
-    )
+    ) {
       return;
+    }
     toggleSelect(rec.id);
   }
 
@@ -234,7 +249,7 @@ export default function RecipesPage() {
         className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         onClick={() => navigate("/")}
       >
-        Back to Home
+        ← Back to Home
       </button>
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
         <h2 className="text-3xl font-bold text-blue-800">Recipes</h2>
@@ -245,7 +260,7 @@ export default function RecipesPage() {
             setEditRecipe(null);
           }}
         >
-          Add Recipe
+          + Add Recipe
         </button>
       </div>
       {/* SEARCH BAR */}
@@ -253,7 +268,7 @@ export default function RecipesPage() {
         <input
           type="text"
           className="w-full border border-gray-300 rounded px-3 py-2 text-base mr-2"
-          placeholder="Search recipe name…"
+          placeholder="Search recipe name"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -263,10 +278,11 @@ export default function RecipesPage() {
           {error}
         </div>
       )}
+
       {/* Selection and Generate */}
       <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
         <span className="font-semibold mr-2">
-          Select recipes to generate a grocery list
+          Select recipes to generate a grocery list:
         </span>
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
@@ -288,6 +304,7 @@ export default function RecipesPage() {
           />
         </div>
       )}
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm rounded-md">
           <thead className="bg-gray-100">
@@ -314,14 +331,14 @@ export default function RecipesPage() {
           <tbody className="bg-white divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-400">
+                <td colSpan="6" className="text-center py-8 text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : filteredRecipes.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan="6"
                   className="text-center py-10 text-gray-300 font-semibold"
                 >
                   No recipes found.
@@ -400,7 +417,7 @@ export default function RecipesPage() {
                               {rec.ingredients.map((ri) =>
                                 ri.ingredient ? (
                                   <tr
-                                    key={ri.id + Math.random()}
+                                    key={ri.id || Math.random()}
                                     className="border-t border-gray-100"
                                   >
                                     <td className="px-2 py-1 font-medium">
@@ -421,7 +438,7 @@ export default function RecipesPage() {
                                         .join(" ")}
                                     </td>
                                     <td className="px-2 py-1 text-gray-600">
-                                      {ri.note ? `(${ri.note})` : "-"}
+                                      {ri.note ? ri.note : "-"}
                                     </td>
                                   </tr>
                                 ) : null
