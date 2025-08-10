@@ -31,7 +31,6 @@ public class RecipeIngredient {
     @Min(value = 0, message = "Quantity must be positive")
     private double quantity; // e.g. 250
 
-    @Column(nullable = false)
     private String unit;
 
     private String note; // Optional prep instructions, e.g., "chopped"
