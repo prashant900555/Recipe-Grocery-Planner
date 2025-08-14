@@ -1299,16 +1299,14 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-2">
                 Paste your recipe text; section headers are ignored
-                automatically.
+                automatically. Dont include unicodeFractionValues like "½" or
+                "⅓"
               </p>
               <div className="bg-gray-50 p-3 rounded text-xs font-mono">
-                <div>Chicken Biryani</div>
-                <div>4 Servings</div>
-                <div>½ tsp Turmeric powder</div>
-                <div>
-                  10-12 no. dry Kashmiri red chillies, soaked, सुखी कश्मीरी लाल
-                  मिर्च
-                </div>
+                <div>&lt;Recipe Name&gt;</div>
+                <div>&lt;X Servings&gt;</div>
+                <div>1/2 tsp Turmeric powder</div>
+                <div>10-12 no. dry Kashmiri red chillies, soaked</div>
                 <div>Chicken thigh 500 gm (boneless)</div>
                 <div>Hung curd 1 1/4 cup</div>
                 <div>Oil 2⅓ tbsp</div>
@@ -1320,9 +1318,6 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
                 <div>Onion ½ cup (chopped)</div>
                 <div>Salt A Pinch</div>
                 <div>1. Anardana Powder</div>
-                <div>2. Aamchur powder 1 tbsp</div>
-                <div>3. Red chilli powder 1 tbsp</div>
-                <div>4. Coriander powder 1 tbsp</div>
               </div>
             </div>
 
