@@ -1496,15 +1496,6 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
                 <div>10-12 no. dry Kashmiri red chillies, soaked</div>
                 <div>Chicken thigh 500 gm (boneless)</div>
                 <div>Hung curd 1 1/4 cup</div>
-                <div>Oil 2 1/3 tbsp</div>
-                <div>Live charcoal + ghee</div>
-                <div>Oil for shallow frying</div>
-                <div>1/2 cup Semolina</div>
-                <div>1 1/3 cup Stock</div>
-                <div>2 1/3 tbsp Sugar</div>
-                <div>Onion 1/2 cup (chopped)</div>
-                <div>Salt A Pinch</div>
-                <div>1. Anardana Powder</div>
               </div>
             </div>
 
