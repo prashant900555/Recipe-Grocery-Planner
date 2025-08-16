@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.StaleObjectStateException;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -64,10 +65,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public RefreshToken rotateRefreshToken(RefreshToken oldToken, String deviceInfo) {
-        // Delete old token
-        refreshTokenRepository.delete(oldToken);
-
-        // Create new token
+        try {
+            refreshTokenRepository.delete(oldToken);
+        } catch (StaleObjectStateException | org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+            // Log and ignore if already deleted
+        }
         return createRefreshToken(oldToken.getUser(), deviceInfo);
     }
 }
