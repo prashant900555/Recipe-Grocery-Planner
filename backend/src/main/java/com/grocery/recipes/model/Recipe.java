@@ -1,6 +1,7 @@
 package com.grocery.recipes.model;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -32,7 +33,13 @@ public class Recipe {
     @Column(nullable = false)
     private Integer servings;
 
-    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    // **FIX: Add JsonIgnore to prevent infinite recursion with User**
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @JsonIgnore  // This prevents User from being serialized with Recipe
+    private User user;
+
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<RecipeIngredient> ingredients = new ArrayList<>();
 }

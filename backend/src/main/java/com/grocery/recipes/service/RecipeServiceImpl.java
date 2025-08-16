@@ -3,6 +3,7 @@ package com.grocery.recipes.service;
 import com.grocery.recipes.model.Ingredient;
 import com.grocery.recipes.model.Recipe;
 import com.grocery.recipes.model.RecipeIngredient;
+import com.grocery.recipes.model.User;
 import com.grocery.recipes.repository.IngredientRepository;
 import com.grocery.recipes.repository.MealPlanItemRepository;
 import com.grocery.recipes.repository.RecipeIngredientRepository;
@@ -36,8 +37,18 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     @Override
+    public List<Recipe> findAllByUser(User user) {
+        return recipeRepository.findByUser(user);
+    }
+
+    @Override
     public Optional<Recipe> findById(Long id) {
         return recipeRepository.findById(id);
+    }
+
+    @Override
+    public Optional<Recipe> findByIdAndUser(Long id, User user) {
+        return recipeRepository.findByIdAndUser(id, user);
     }
 
     @Override
@@ -45,6 +56,7 @@ public class RecipeServiceImpl implements RecipeService {
     public Recipe save(Recipe recipe) {
         List<RecipeIngredient> newIngredients = new ArrayList<>();
         for (RecipeIngredient ri : recipe.getIngredients()) {
+
             Ingredient dbIng;
 
             // Check if ingredient has an ID and exists in database
@@ -89,47 +101,72 @@ public class RecipeServiceImpl implements RecipeService {
         recipeRepository.deleteById(id);
     }
 
-    // NEW: Update servings and scale ingredient quantities in database
     @Override
     @Transactional
-    public void updateServingsAndScaleQuantities(Long id, Integer newServings) {
-        if (newServings == null || newServings < 1 || newServings > 100) {
-            throw new IllegalArgumentException("Servings must be between 1 and 100");
+    public void deleteByIdAndUser(Long id, User user) {
+        // Check if recipe belongs to user and if it's used in meal plans
+        Optional<Recipe> recipeOpt = recipeRepository.findByIdAndUser(id, user);
+        if (recipeOpt.isEmpty()) {
+            throw new IllegalArgumentException("Recipe not found or doesn't belong to user");
         }
 
-        Optional<Recipe> recipeOpt = recipeRepository.findById(id);
+        int usageCount = mealPlanItemRepository.countByRecipeId(id);
+        if (usageCount > 0) {
+            throw new IllegalStateException("Recipe is used in one or more meal plans and cannot be deleted.");
+        }
+        recipeRepository.deleteByIdAndUser(id, user);
+    }
+
+    @Override
+    public boolean existsByIdAndUser(Long id, User user) {
+        return recipeRepository.existsByIdAndUser(id, user);
+    }
+
+    @Override
+    @Transactional
+    public void updateServingsAndScaleQuantities(Long id, Integer servings, User user) {
+        Optional<Recipe> recipeOpt = recipeRepository.findByIdAndUser(id, user);
         if (recipeOpt.isEmpty()) {
-            throw new IllegalArgumentException("Recipe not found with id " + id);
+            throw new IllegalArgumentException("Recipe not found or doesn't belong to user");
         }
 
         Recipe recipe = recipeOpt.get();
-        Integer originalServings = recipe.getServings();
-
-        if (originalServings == null || originalServings == 0) {
-            originalServings = 1; // Fallback to prevent division by zero
+        if (servings == null || servings < 1 || servings > 100) {
+            throw new IllegalArgumentException("Servings must be between 1 and 100");
         }
 
-        // Scale all ingredient quantities based on servings change
-        if (recipe.getIngredients() != null && !recipe.getIngredients().isEmpty()) {
-            for (RecipeIngredient ingredient : recipe.getIngredients()) {
-                double originalQuantity = ingredient.getQuantity();
-                double scaledQuantity = (originalQuantity * newServings) / originalServings;
-                ingredient.setQuantity(scaledQuantity);
-            }
-        }
+        // Calculate scaling factor
+        double factor = (double) servings / recipe.getServings();
 
         // Update servings
-        recipe.setServings(newServings);
+        recipe.setServings(servings);
 
-        // Save the recipe with updated servings and scaled quantities
+        // Scale ingredient quantities
+        for (RecipeIngredient ri : recipe.getIngredients()) {
+            ri.setQuantity(ri.getQuantity() * factor);
+        }
+
         recipeRepository.save(recipe);
     }
 
     @Override
-    public void setAllRecipesDefaultServings(int defaultServings) {
-        List<Recipe> allRecipes = findAll();
-        for (Recipe recipe : allRecipes) {
-            updateServingsAndScaleQuantities(recipe.getId(), defaultServings);
+    @Transactional
+    public void setAllRecipesDefaultServings(Integer servings, User user) {
+        if (servings == null || servings < 1 || servings > 100) {
+            throw new IllegalArgumentException("Servings must be between 1 and 100");
         }
+
+        List<Recipe> userRecipes = recipeRepository.findByUser(user);
+        for (Recipe recipe : userRecipes) {
+            double factor = (double) servings / recipe.getServings();
+            recipe.setServings(servings);
+
+            // Scale ingredient quantities
+            for (RecipeIngredient ri : recipe.getIngredients()) {
+                ri.setQuantity(ri.getQuantity() * factor);
+            }
+        }
+
+        recipeRepository.saveAll(userRecipes);
     }
 }

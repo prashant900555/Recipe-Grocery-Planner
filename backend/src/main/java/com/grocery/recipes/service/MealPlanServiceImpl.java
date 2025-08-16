@@ -1,6 +1,7 @@
 package com.grocery.recipes.service;
 
 import com.grocery.recipes.model.MealPlan;
+import com.grocery.recipes.model.User;
 import com.grocery.recipes.repository.MealPlanRepository;
 import org.springframework.stereotype.Service;
 
@@ -22,8 +23,18 @@ public class MealPlanServiceImpl implements MealPlanService {
     }
 
     @Override
+    public List<MealPlan> findAllByUser(User user) {
+        return mealPlanRepository.findByUser(user);
+    }
+
+    @Override
     public Optional<MealPlan> findById(Long id) {
         return mealPlanRepository.findById(id);
+    }
+
+    @Override
+    public Optional<MealPlan> findByIdAndUser(Long id, User user) {
+        return mealPlanRepository.findByIdAndUser(id, user);
     }
 
     @Override
@@ -35,5 +46,15 @@ public class MealPlanServiceImpl implements MealPlanService {
     @Override
     public void deleteById(Long id) {
         mealPlanRepository.deleteById(id);
+    }
+
+    @Override
+    public void deleteByIdAndUser(Long id, User user) {
+        mealPlanRepository.deleteByIdAndUser(id, user);
+    }
+
+    @Override
+    public boolean existsByIdAndUser(Long id, User user) {
+        return mealPlanRepository.existsByIdAndUser(id, user);
     }
 }
