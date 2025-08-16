@@ -27,15 +27,22 @@ function debounce(func, wait) {
 // Unit conversion utility functions
 const convertUnits = (quantity, unit) => {
   const num = parseFloat(quantity);
-  if (isNaN(num) || num <= 0) return `${quantity} ${unit}`;
-  if (unit === "g" && num >= 1000) return `${(num / 1000).toFixed(2)} kg`;
-  if (unit === "kg" && num < 1) return `${(num * 1000).toFixed(2)} g`;
-  if (unit === "ml" && num >= 1000) return `${(num / 1000).toFixed(2)} l`;
-  if (unit === "l" && num < 1) return `${(num * 1000).toFixed(2)} ml`;
-  if (unit === "oz" && num >= 16) return `${(num / 16).toFixed(2)} lb`;
-  if (unit === "tsp" && num >= 3) return `${(num / 3).toFixed(2)} tbsp`;
-  if (unit === "tbsp" && num >= 16) return `${(num / 16).toFixed(2)} cup`;
-  return `${num.toFixed(2)} ${unit}`;
+  if (isNaN(num) || num === 0) return `${quantity} ${unit}`;
+
+  const formatNumber = (value) => {
+    if (value % 1 === 0) return value;
+    return Number(value.toFixed(2)).toString();
+  };
+
+  if (unit === "g" && num >= 1000) return `${formatNumber(num / 1000)} kg`;
+  if (unit === "kg" && num < 1) return `${formatNumber(num * 1000)} g`;
+  if (unit === "ml" && num >= 1000) return `${formatNumber(num / 1000)} l`;
+  if (unit === "l" && num < 1) return `${formatNumber(num * 1000)} ml`;
+  if (unit === "oz" && num >= 16) return `${formatNumber(num / 16)} lb`;
+  if (unit === "tsp" && num >= 3) return `${formatNumber(num / 3)} tbsp`;
+  if (unit === "tbsp" && num >= 16) return `${formatNumber(num / 16)} cup`;
+
+  return `${formatNumber(num)} ${unit}`;
 };
 
 export default function RecipesPage() {
@@ -50,6 +57,7 @@ export default function RecipesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredRecipes, setFilteredRecipes] = useState([]);
   const [settingDefaultServings, setSettingDefaultServings] = useState(false); // NEW state
+  const [deleting, setDeleting] = useState(false); // NEW state for delete operation
   const searchRef = useRef(); // for debounced search handler
   const navigate = useNavigate();
 
@@ -95,8 +103,7 @@ export default function RecipesPage() {
           return newQueue;
         });
       }
-    }, 2000),
-    []
+    }, 2000)
   );
 
   useEffect(() => {
@@ -112,8 +119,7 @@ export default function RecipesPage() {
             r.name.toLowerCase().includes(term.toLowerCase())
           );
       setFilteredRecipes(f);
-    }, 250),
-    []
+    }, 250)
   );
 
   useEffect(() => {
@@ -161,6 +167,34 @@ export default function RecipesPage() {
     }
   }
 
+  // NEW function to handle deleting selected recipes
+  async function handleDeleteSelected() {
+    if (!selected.length) {
+      setError("Select recipes to delete.");
+      return;
+    }
+
+    if (!window.confirm(`Delete ${selected.length} selected recipes?`)) return;
+
+    setDeleting(true);
+    try {
+      // Delete each selected recipe
+      for (const id of selected) {
+        await deleteRecipe(id);
+      }
+      // Remove deleted recipes from local state
+      setRecipes((prev) =>
+        prev.filter((recipe) => !selected.includes(recipe.id))
+      );
+      setSelected([]); // Clear selection
+      setError("");
+    } catch {
+      setError("Failed to delete selected recipes.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function toggleSelect(id) {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -193,7 +227,7 @@ export default function RecipesPage() {
     debouncedUpdateServings(recipeId, parsedServings);
   }
 
-  // NEW: Handle default servings for individual recipe
+  // NEW Handle default servings for individual recipe
   async function handleSetDefaultServings(recipeId) {
     try {
       await updateRecipeServings(recipeId, 2);
@@ -212,7 +246,7 @@ export default function RecipesPage() {
     }
   }
 
-  // NEW: Handle global default servings
+  // NEW Handle global default servings
   async function handleSetAllDefaultServings() {
     if (
       !window.confirm(
@@ -254,7 +288,7 @@ export default function RecipesPage() {
     try {
       const dateStr = todayDDMMYYYY();
       const firstId = selected[0];
-      const dynamicName = `Recipe${dateStr}${firstId}`;
+      const dynamicName = `Recipe-${dateStr}-${firstId}`;
       await generateFromRecipes(selected, dynamicName, dateStr);
       setGenerating(false);
       navigate("/grocerylists");
@@ -303,7 +337,7 @@ export default function RecipesPage() {
         className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         onClick={() => navigate("/")}
       >
-        Back to Home
+        ← Back to Home
       </button>
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
         <h2 className="text-3xl font-bold text-blue-800">Recipes</h2>
@@ -336,7 +370,7 @@ export default function RecipesPage() {
       {/* Selection and Generate */}
       <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
         <span className="font-semibold mr-2">
-          Select recipes to generate a grocery list
+          Select recipes to generate a grocery list:
         </span>
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
@@ -345,7 +379,7 @@ export default function RecipesPage() {
         >
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
-        {/* NEW: Global Default Servings Button */}
+        {/* NEW Global Default Servings Button */}
         <button
           className="px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700"
           onClick={handleSetAllDefaultServings}
@@ -354,6 +388,14 @@ export default function RecipesPage() {
           {settingDefaultServings
             ? "Setting..."
             : "Set All to Default Servings"}
+        </button>
+        {/* NEW Delete Selected Button */}
+        <button
+          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+          onClick={handleDeleteSelected}
+          disabled={deleting || selected.length === 0}
+        >
+          {deleting ? "Deleting..." : "Delete Selected Recipes"}
         </button>
       </div>
       {showForm && (
@@ -415,21 +457,19 @@ export default function RecipesPage() {
                 return (
                   <tr
                     key={rec.id}
-                    className="hover:bg-blue-50 transition"
+                    className="hover:bg-blue-50 transition cursor-pointer"
                     onClick={(evt) => handleRowClick(rec, evt)}
-                    style={{ cursor: "pointer" }}
                   >
                     <td className="py-2 px-4">
                       <input
                         type="checkbox"
                         checked={selected.includes(rec.id)}
                         onChange={() => toggleSelect(rec.id)}
+                        onClick={(e) => e.stopPropagation()}
                         className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                     </td>
-                    <td className="py-2 px-4 font-medium capitalize">
-                      {rec.name}
-                    </td>
+                    <td className="py-2 px-4 font-medium">{rec.name}</td>
                     <td className="py-2 px-4 text-gray-600">
                       {rec.description || "-"}
                     </td>
@@ -439,18 +479,17 @@ export default function RecipesPage() {
                           type="number"
                           min="1"
                           max="100"
-                          className="border border-gray-300 rounded px-2 py-1 w-16 text-sm"
+                          className="border border-gray-300 rounded px-2 py-1 w-16"
                           value={displayServings}
                           onChange={(e) =>
                             handleServingsChange(rec.id, e.target.value)
                           }
                           onClick={(e) => e.stopPropagation()}
                         />
-                        {/* NEW: Individual Default Servings Button */}
                         <button
-                          className="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-xs"
+                          onClick={(evt) => {
+                            evt.stopPropagation();
                             handleSetDefaultServings(rec.id);
                           }}
                           title="Set to 2 servings"

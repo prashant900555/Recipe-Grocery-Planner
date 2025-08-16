@@ -39,14 +39,20 @@ const ALL_UNITS = [
 function autoConvertUnit(quantity, unit) {
   let num = parseFloat(quantity);
   let u = unit;
-  if (u === "g" && num >= 1000) return [(num / 1000).toFixed(2), "kg"];
-  if (u === "kg" && num < 1) return [(num * 1000).toFixed(2), "g"];
-  if (u === "ml" && num >= 1000) return [(num / 1000).toFixed(2), "l"];
-  if (u === "l" && num < 1) return [(num * 1000).toFixed(2), "ml"];
-  if (u === "oz" && num >= 16) return [(num / 16).toFixed(2), "lb"];
-  if (u === "tsp" && num >= 3) return [(num / 3).toFixed(2), "tbsp"];
-  if (u === "tbsp" && num >= 16) return [(num / 16).toFixed(2), "cup"];
-  return [isNaN(num) ? "" : num.toFixed(2), u];
+
+  function formatNumber(n) {
+    if (Number.isInteger(n)) return n.toString();
+    return parseFloat(n.toFixed(2)).toString();
+  }
+
+  if (u === "g" && num >= 1000) return [formatNumber(num / 1000), "kg"];
+  if (u === "kg" && num < 1) return [formatNumber(num * 1000), "g"];
+  if (u === "ml" && num >= 1000) return [formatNumber(num / 1000), "l"];
+  if (u === "l" && num < 1) return [formatNumber(num * 1000), "ml"];
+  if (u === "oz" && num >= 16) return [formatNumber(num / 16), "lb"];
+  if (u === "tsp" && num >= 3) return [formatNumber(num / 3), "tbsp"];
+  if (u === "tbsp" && num >= 16) return [formatNumber(num / 16), "cup"];
+  return [isNaN(num) ? "" : formatNumber(num), u];
 }
 
 function todayAsDDMMYYYY() {

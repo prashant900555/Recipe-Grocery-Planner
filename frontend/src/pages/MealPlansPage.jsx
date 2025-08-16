@@ -30,6 +30,7 @@ export default function MealPlansPage() {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredPlans, setFilteredPlans] = useState([]);
 
@@ -103,6 +104,35 @@ export default function MealPlansPage() {
       fetchAll();
     } catch {
       setError("Failed to delete meal plan.");
+    }
+  }
+
+  async function handleDeleteSelected() {
+    if (selected.length === 0) {
+      setError("Please select at least one meal plan to delete.");
+      return;
+    }
+
+    const count = selected.length;
+    if (
+      !window.confirm(
+        `Delete ${count} selected meal plan${count > 1 ? "s" : ""}?`
+      )
+    )
+      return;
+
+    setDeleting(true);
+    setError("");
+
+    try {
+      // Delete all selected meal plans
+      await Promise.all(selected.map((id) => deleteMealPlan(id)));
+      setSelected([]); // Clear selection
+      fetchAll(); // Refresh the list
+    } catch {
+      setError("Failed to delete some meal plans.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -213,19 +243,30 @@ export default function MealPlansPage() {
         </div>
       )}
 
-      {/* Selection and Generate */}
+      {/* Selection and Actions */}
       <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
-        <span className="font-semibold mr-2">
-          Select meal plans to generate a grocery list:
-        </span>
+        <span className="font-semibold mr-2">Select meal plans:</span>
         <button
-          className="px-3 py-1 bg-green-700 text-white rounded"
+          className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800 disabled:bg-gray-400"
           onClick={handleGenerate}
           disabled={generating || selected.length === 0}
         >
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
+        <button
+          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
+          onClick={handleDeleteSelected}
+          disabled={deleting || selected.length === 0}
+        >
+          {deleting ? "Deleting..." : "Delete Selected"}
+        </button>
+        {selected.length > 0 && (
+          <span className="text-sm text-gray-600">
+            ({selected.length} selected)
+          </span>
+        )}
       </div>
+
       {showForm && (
         <div className="mb-10">
           <MealPlanForm

@@ -29,6 +29,12 @@ const UNIT_OPTIONS = [
   "dash",
   "pack",
   "box",
+  "large",
+  "medium",
+  "small",
+  "inch",
+  "cm",
+  "mm",
 ];
 
 const UNIT_CONVERSIONS = {
@@ -69,12 +75,17 @@ const UNIT_CONVERSIONS = {
   table_spoon: "tbsp",
   table_spoons: "tbsp",
 
+  Teaspoons: "tsp",
   teaspoon: "tsp",
   teaspoons: "tsp",
   tsps: "tsp",
+  tspn: "tsp",
+  tspns: "tsp",
   tea_spoon: "tsp",
   tea_spoons: "tsp",
+  "teaspoon(s)": "tsp",
 
+  stick: "pcs",
   piece: "pcs",
   pieces: "pcs",
   pc: "pcs",
@@ -114,6 +125,18 @@ const UNIT_CONVERSIONS = {
   boxes: "box",
   bx: "box",
   bxs: "box",
+
+  inches: "inch",
+  inchs: "inch",
+  in: "inch",
+  centimeters: "cm",
+  centimetres: "cm",
+  centimetre: "cm",
+  cm: "cm",
+  millimeters: "mm",
+  millimetres: "mm",
+  millimeter: "mm",
+  mm: "mm",
 };
 
 function normalizeUnit(unit) {
@@ -133,6 +156,9 @@ const HEADER_PATTERNS = [
   /^for\s*rawa\s*fry\s*:?$/i,
   /^other\s*ingredients\s*:?$/i,
   /^for\s*garnish\s*:?$/i,
+  /^for\s*puran\s*mixture\s*[-–—]\s*sweet\s*filling\s*:?$/i,
+  /^for.*:?$/i, // Added generic pattern for lines starting with "for"
+  /^For.*:?$/i, // Added generic pattern for lines starting with "For"
   // REMOVED: numbered list patterns - we now strip and parse these instead of ignoring
 ];
 
@@ -601,6 +627,18 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     return null;
   }
 
+  // Helper: format quantity with at most two decimals, but drop trailing zeros
+  function formatQuantity(num) {
+    if (num == null || !isFinite(num)) return "";
+    const rounded = Math.round(num * 100) / 100;
+    // If it's effectively an integer, return without decimals
+    if (Math.abs(rounded - Math.round(rounded)) < 1e-9) {
+      return String(Math.round(rounded));
+    }
+    // Else keep up to 2 decimals without trailing zeros (e.g., 0.5, 2.25)
+    return Number(rounded.toFixed(2)).toString();
+  }
+
   // Enhanced function to detect consecutive quantity tokens and combine them into mixed fractions
   function parseConsecutiveQuantities(tokens, startIndex) {
     let totalQuantity = null;
@@ -680,8 +718,6 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         .join(", ");
     }
 
-    const allNotes = [...notes, commaNote].filter((n) => n).join(", ");
-
     if (!primaryPart || isHeaderLine(primaryPart)) {
       return null;
     }
@@ -702,7 +738,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         ingredientName: capitalizeWords(ingName),
         quantity: "",
         unit: unit || "",
-        note: allNotes,
+        note: [...notes, commaNote].filter((n) => n).join(", "),
       };
     }
 
@@ -718,7 +754,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         ingredientName: capitalizeWords(ingName),
         quantity: "",
         unit: unit || "",
-        note: allNotes,
+        note: [...notes, commaNote].filter((n) => n).join(", "),
       };
     }
 
@@ -733,7 +769,10 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         ingredientName: capitalizeWords(ingName),
         quantity: "",
         unit: "",
-        note: joinNotes("to taste", allNotes),
+        note: joinNotes(
+          "to taste",
+          [...notes, commaNote].filter((n) => n).join(", ")
+        ),
       };
     }
 
@@ -746,7 +785,10 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         ingredientName: capitalizeWords(ingName),
         quantity: "",
         unit: "",
-        note: joinNotes(restNote, allNotes),
+        note: joinNotes(
+          restNote,
+          [...notes, commaNote].filter((n) => n).join(", ")
+        ),
       };
     }
 
@@ -766,7 +808,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         ingredientName: capitalizeWords(name),
         quantity: "",
         unit: "",
-        note: allNotes,
+        note: [...notes, commaNote].filter((n) => n).join(", "),
       };
     }
 
@@ -853,7 +895,27 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     const excludedIndices = new Set(
       [...quantityIndices, unitIndex].filter((idx) => idx !== -1)
     );
-    const nameTokens = tokens.filter((_, i) => !excludedIndices.has(i));
+    let nameTokens = tokens.filter((_, i) => !excludedIndices.has(i));
+
+    // Handle dash-separated notes (e.g., "water - for cooking")
+    let dashIndex = -1;
+    for (let i = 0; i < nameTokens.length; i++) {
+      if (nameTokens[i] === "-") {
+        dashIndex = i;
+        break;
+      }
+    }
+
+    let dashNote = "";
+    if (dashIndex !== -1 && dashIndex < nameTokens.length - 1) {
+      // Extract note after dash
+      dashNote = nameTokens
+        .slice(dashIndex + 1)
+        .join(" ")
+        .trim();
+      // Keep only tokens before dash for ingredient name
+      nameTokens = nameTokens.slice(0, dashIndex);
+    }
 
     let ingredientName = nameTokens.join(" ").trim();
 
@@ -888,19 +950,134 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       "fried",
       "boiled",
       "raw",
+      "peeled",
+      "sautéed",
+      "sauteed",
+      "cooked",
+      "seasoned",
+      "seasoning",
+      "seasoned with",
+      "seasoning with",
+      "peeled and finely chopped",
+      "Peeled And Finely Chopped",
+      "peeled and finely diced",
+      "peeled and chopped",
+      "peeled and diced",
+      "peeled and minced",
+      "peeled and crushed",
+      "peeled and grated",
+      "peeled and sliced",
+      "unskinned",
+      "unpeeled",
     ];
+
+    // FIX: handle "<number> inch piece of <ingredient> ..." as count of pieces (pcs) and move description to notes
+    // Example: "2 inch piece of ginger peeled and finely chopped"
+    if (
+      quantity !== null &&
+      unit === "inch" &&
+      /(^|\s)piece(s)?\s+of\s+/i.test(ingredientName)
+    ) {
+      // Extract the part after "piece of" to isolate the ingredient phrase
+      const afterPiece = ingredientName
+        .replace(/.*?\bpiece(?:s)?\s+of\s+/i, "")
+        .trim();
+      // Split the phrase into words to detect any trailing preparation notes starting with known adjectives
+      const words = afterPiece.split(/\s+/);
+      let cutIndex = words.length;
+      // Determine where the ingredient name ends and where notes begin using adjective prefixes
+      for (let i = 0; i < words.length; i++) {
+        const w = words.slice(i).join(" ").toLowerCase();
+        // If the remaining phrase starts with any adjective prefix, we cut at i
+        if (adjectivePrefixes.some((adj) => w.startsWith(adj))) {
+          cutIndex = i;
+          break;
+        }
+      }
+
+      const ingCore = words.slice(0, cutIndex).join(" ").trim();
+      const trailingNote = words.slice(cutIndex).join(" ").trim();
+
+      const finalName = extractEnglish(ingCore || afterPiece);
+      const finalAllNotes = [
+        ...notes,
+        commaNote,
+        dashNote,
+        "piece",
+        trailingNote,
+      ]
+        .filter((n) => n)
+        .join(", ");
+
+      return {
+        ingredientName: capitalizeWords(finalName),
+        quantity: formatQuantity(quantity), // formatted numeric count of pieces
+        unit: "pcs", // convert from "inch" piece(s) to pcs
+        note: finalAllNotes,
+      };
+    }
+
+    // Also handle patterns like "<number> inch <ingredient> piece ..." -> pcs
+    if (
+      quantity !== null &&
+      unit === "inch" &&
+      /\bpiece(s)?\b/i.test(ingredientName)
+    ) {
+      // Try to locate "piece" and split ingredient name around it
+      const beforeAfter = ingredientName.split(/\bpiece(?:s)?\b/i);
+      const before = (beforeAfter[0] || "").trim();
+      const after = (beforeAfter[1] || "").trim();
+
+      // Prefer the side containing "of <ingredient>" or a clear ingredient token
+      let candidate = after || before;
+      candidate = candidate.replace(/^of\s+/i, "").trim();
+
+      // Separate trailing adjective notes
+      const words = candidate.split(/\s+/);
+      let cutIndex = words.length;
+      for (let i = 0; i < words.length; i++) {
+        const w = words.slice(i).join(" ").toLowerCase();
+        if (adjectivePrefixes.some((adj) => w.startsWith(adj))) {
+          cutIndex = i;
+          break;
+        }
+      }
+      const ingCore = words.slice(0, cutIndex).join(" ").trim();
+      const trailingNote = words.slice(cutIndex).join(" ").trim();
+
+      const finalName = extractEnglish(ingCore || candidate);
+      const finalAllNotes = [
+        ...notes,
+        commaNote,
+        dashNote,
+        "piece",
+        trailingNote,
+      ]
+        .filter((n) => n)
+        .join(", ");
+
+      return {
+        ingredientName: capitalizeWords(finalName),
+        quantity: formatQuantity(quantity),
+        unit: "pcs",
+        note: finalAllNotes,
+      };
+    }
+
     const lowered = ingredientName.toLowerCase();
     for (const adj of adjectivePrefixes) {
       if (lowered.startsWith(adj + " ")) {
         const rest = ingredientName.slice(adj.length).trim();
         ingredientName = rest;
-        const updatedNote = joinNotes(adj, allNotes);
         const finalName = extractEnglish(ingredientName);
+        const finalAllNotes = [...notes, commaNote, dashNote, adj]
+          .filter((n) => n)
+          .join(", ");
         return {
           ingredientName: capitalizeWords(finalName),
-          quantity: quantity !== null ? quantity.toString() : "",
+          quantity: quantity !== null ? formatQuantity(quantity) : "",
           unit: unit || "",
-          note: updatedNote,
+          note: finalAllNotes,
         };
       }
     }
@@ -909,11 +1086,19 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
     ingredientName = extractEnglish(ingredientName);
     if (!ingredientName) return null;
 
+    // Default unit rule: if quantity exists but unit missing, default to "pcs"
+    const finalUnit = (unit && unit.trim()) || (quantity !== null ? "pcs" : "");
+
+    // Update allNotes to include dash-separated note
+    const finalAllNotes = [...notes, commaNote, dashNote]
+      .filter((n) => n)
+      .join(", ");
+
     return {
       ingredientName: capitalizeWords(ingredientName),
-      quantity: quantity !== null ? quantity.toString() : "",
-      unit: unit || "",
-      note: allNotes,
+      quantity: quantity !== null ? formatQuantity(quantity) : "",
+      unit: finalUnit,
+      note: finalAllNotes,
     };
   }
 
@@ -1030,7 +1215,7 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
           ingredientName: orig.ingredient ? orig.ingredient.name : "",
           inputValue: orig.ingredient ? orig.ingredient.name : "",
           quantity: isFinite(Number(orig.quantity * factor))
-            ? Number(orig.quantity * factor).toFixed(2)
+            ? formatQuantity(Number(orig.quantity * factor))
             : "",
           unit: orig.unit || "",
           note: orig.note || "",
@@ -1068,20 +1253,18 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
       return;
     }
 
-    const invalidRows = ingredients.filter((row) => {
+    // Normalize missing units to 'pcs' when quantity is present
+    ingredients.forEach((row) => {
       const hasQuantity =
         row.quantity &&
         String(row.quantity).trim() &&
         !isNaN(Number(row.quantity)) &&
         Number(row.quantity) > 0;
       const hasUnit = row.unit && row.unit.trim();
-      return hasQuantity && !hasUnit;
+      if (hasQuantity && !hasUnit) {
+        row.unit = "pcs";
+      }
     });
-
-    if (invalidRows.length > 0) {
-      setError("Ingredients with quantity must also have a unit.");
-      return;
-    }
 
     setError("");
 
@@ -1099,9 +1282,11 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
         },
         quantity:
           row.quantity && String(row.quantity).trim()
-            ? Number(row.quantity)
+            ? Number(formatQuantity(Number(row.quantity)))
             : 0,
-        unit: row.unit || "",
+        unit:
+          (row.unit && row.unit.trim()) ||
+          (row.quantity && String(row.quantity).trim() ? "pcs" : ""),
         note: row.note,
         id: row.id,
       })),
@@ -1209,7 +1394,9 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
                         className="border border-gray-300 rounded px-2 py-1 w-20"
                         value={row.quantity}
                         onChange={(e) =>
-                          updateIngredientRow(idx, { quantity: e.target.value })
+                          updateIngredientRow(idx, {
+                            quantity: e.target.value,
+                          })
                         }
                       />
                     </td>
@@ -1309,13 +1496,13 @@ export default function RecipeForm({ initialData, onSubmit, onCancel }) {
                 <div>10-12 no. dry Kashmiri red chillies, soaked</div>
                 <div>Chicken thigh 500 gm (boneless)</div>
                 <div>Hung curd 1 1/4 cup</div>
-                <div>Oil 2⅓ tbsp</div>
+                <div>Oil 2 1/3 tbsp</div>
                 <div>Live charcoal + ghee</div>
                 <div>Oil for shallow frying</div>
-                <div>⅓ cup Semolina</div>
-                <div>1 ⅓ cup Stock</div>
+                <div>1/2 cup Semolina</div>
+                <div>1 1/3 cup Stock</div>
                 <div>2 1/3 tbsp Sugar</div>
-                <div>Onion ½ cup (chopped)</div>
+                <div>Onion 1/2 cup (chopped)</div>
                 <div>Salt A Pinch</div>
                 <div>1. Anardana Powder</div>
               </div>
