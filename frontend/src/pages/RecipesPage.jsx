@@ -4,8 +4,8 @@ import {
   createRecipe,
   updateRecipe,
   deleteRecipe,
-  updateRecipeServings, // NEW import
-  setAllRecipesDefaultServings, // NEW import
+  updateRecipeServings,
+  setAllRecipesDefaultServings,
 } from "../services/recipeService";
 import { generateFromRecipes } from "../services/groceryListService";
 import RecipeForm from "../components/RecipeForm";
@@ -27,10 +27,10 @@ function debounce(func, wait) {
 // Unit conversion utility functions
 const convertUnits = (quantity, unit) => {
   const num = parseFloat(quantity);
-  if (isNaN(num) || num === 0) return `${quantity} ${unit}`;
+  if (isNaN(num) || num <= 0) return `${quantity} ${unit}`;
 
   const formatNumber = (value) => {
-    if (value % 1 === 0) return value;
+    if (value < 1 && value > 0) return value;
     return Number(value.toFixed(2)).toString();
   };
 
@@ -46,6 +46,7 @@ const convertUnits = (quantity, unit) => {
 };
 
 export default function RecipesPage() {
+  // Initialize all state properly to avoid undefined errors
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -56,19 +57,21 @@ export default function RecipesPage() {
   const [servingsUpdateQueue, setServingsUpdateQueue] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredRecipes, setFilteredRecipes] = useState([]);
-  const [settingDefaultServings, setSettingDefaultServings] = useState(false); // NEW state
-  const [deleting, setDeleting] = useState(false); // NEW state for delete operation
-  const searchRef = useRef(); // for debounced search handler
+  const [settingDefaultServings, setSettingDefaultServings] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
 
   const fetchAllRecipes = async () => {
     setLoading(true);
     try {
       const fetchedRecipes = await getRecipes();
-      setRecipes(fetchedRecipes);
+      // Ensure we always set an array, even if API returns null/undefined
+      setRecipes(Array.isArray(fetchedRecipes) ? fetchedRecipes : []);
       setError("");
-    } catch {
+    } catch (err) {
+      console.error("Error fetching recipes:", err);
       setError("Failed to fetch recipes.");
+      setRecipes([]);
     } finally {
       setLoading(false);
     }
@@ -79,7 +82,6 @@ export default function RecipesPage() {
     debounce(async (recipeId, servings) => {
       try {
         await updateRecipeServings(recipeId, servings);
-        // Fetch updated recipe from backend and update only that recipe in local state
         const updatedRecipes = await getRecipes();
         const updatedRecipe = updatedRecipes.find((r) => r.id === recipeId);
         if (updatedRecipe) {
@@ -89,13 +91,13 @@ export default function RecipesPage() {
             )
           );
         }
-
         setServingsUpdateQueue((prev) => {
           const newQueue = { ...prev };
           delete newQueue[recipeId];
           return newQueue;
         });
       } catch (error) {
+        console.error("Error updating servings:", error);
         setError(`Failed to save servings update for recipe ${recipeId}`);
         setServingsUpdateQueue((prev) => {
           const newQueue = { ...prev };
@@ -103,7 +105,8 @@ export default function RecipesPage() {
           return newQueue;
         });
       }
-    }, 2000)
+    }, 2000),
+    []
   );
 
   useEffect(() => {
@@ -118,26 +121,26 @@ export default function RecipesPage() {
         : recipesData.filter((r) =>
             r.name.toLowerCase().includes(term.toLowerCase())
           );
-      setFilteredRecipes(f);
-    }, 250)
+      setFilteredRecipes(Array.isArray(f) ? f : []);
+    }, 250),
+    []
   );
 
   useEffect(() => {
     debouncedSearch(searchTerm, recipes);
   }, [searchTerm, recipes, debouncedSearch]);
 
-  // also keep the filtered list in sync on first mount
   useEffect(() => {
-    setFilteredRecipes(recipes);
+    setFilteredRecipes(Array.isArray(recipes) ? recipes : []);
   }, [recipes]);
 
   async function handleCreate(data) {
     try {
       const newRecipe = await createRecipe(data);
-      // Add new recipe to local state instead of refetching
       setRecipes((prev) => [...prev, newRecipe]);
       setShowForm(false);
-    } catch {
+    } catch (err) {
+      console.error("Error creating recipe:", err);
       setError("Failed to create recipe.");
     }
   }
@@ -145,13 +148,13 @@ export default function RecipesPage() {
   async function handleUpdate(data) {
     try {
       const updatedRecipe = await updateRecipe(data.id, data);
-      // Update local state instead of refetching all recipes
       setRecipes((prev) =>
         prev.map((recipe) => (recipe.id === data.id ? updatedRecipe : recipe))
       );
       setShowForm(false);
       setEditRecipe(null);
-    } catch {
+    } catch (err) {
+      console.error("Error updating recipe:", err);
       setError("Failed to update recipe.");
     }
   }
@@ -160,14 +163,13 @@ export default function RecipesPage() {
     if (!window.confirm("Delete this recipe?")) return;
     try {
       await deleteRecipe(id);
-      // Remove from local state instead of refetching
       setRecipes((prev) => prev.filter((recipe) => recipe.id !== id));
-    } catch {
+    } catch (err) {
+      console.error("Error deleting recipe:", err);
       setError("Failed to delete recipe.");
     }
   }
 
-  // NEW function to handle deleting selected recipes
   async function handleDeleteSelected() {
     if (!selected.length) {
       setError("Select recipes to delete.");
@@ -178,17 +180,16 @@ export default function RecipesPage() {
 
     setDeleting(true);
     try {
-      // Delete each selected recipe
       for (const id of selected) {
         await deleteRecipe(id);
       }
-      // Remove deleted recipes from local state
       setRecipes((prev) =>
         prev.filter((recipe) => !selected.includes(recipe.id))
       );
-      setSelected([]); // Clear selection
+      setSelected([]);
       setError("");
-    } catch {
+    } catch (err) {
+      console.error("Error deleting selected recipes:", err);
       setError("Failed to delete selected recipes.");
     } finally {
       setDeleting(false);
@@ -201,8 +202,9 @@ export default function RecipesPage() {
     );
   }
 
-  // Select all filtered/visible recipes
   function toggleSelectAll() {
+    if (!Array.isArray(filteredRecipes)) return;
+
     if (
       filteredRecipes.every((r) => selected.includes(r.id)) &&
       filteredRecipes.length > 0
@@ -227,11 +229,9 @@ export default function RecipesPage() {
     debouncedUpdateServings(recipeId, parsedServings);
   }
 
-  // NEW Handle default servings for individual recipe
   async function handleSetDefaultServings(recipeId) {
     try {
       await updateRecipeServings(recipeId, 2);
-      // Update local state
       const updatedRecipes = await getRecipes();
       const updatedRecipe = updatedRecipes.find((r) => r.id === recipeId);
       if (updatedRecipe) {
@@ -241,12 +241,12 @@ export default function RecipesPage() {
           )
         );
       }
-    } catch {
+    } catch (err) {
+      console.error("Error setting default servings:", err);
       setError(`Failed to set default servings for recipe ${recipeId}`);
     }
   }
 
-  // NEW Handle global default servings
   async function handleSetAllDefaultServings() {
     if (
       !window.confirm(
@@ -260,9 +260,9 @@ export default function RecipesPage() {
     setError("");
     try {
       await setAllRecipesDefaultServings();
-      // Refresh all recipes to get updated data
       await fetchAllRecipes();
     } catch (e) {
+      console.error("Error setting default servings for all recipes:", e);
       let message = "Failed to set default servings for all recipes.";
       if (e.response?.data) {
         if (typeof e.response.data === "string") message = e.response.data;
@@ -293,6 +293,7 @@ export default function RecipesPage() {
       setGenerating(false);
       navigate("/grocerylists");
     } catch (e) {
+      console.error("Error generating grocery list:", e);
       let message = "Failed to generate grocery list.";
       if (e.response?.data) {
         if (typeof e.response.data === "string") message = e.response.data;
@@ -314,9 +315,7 @@ export default function RecipesPage() {
     return `${dd}-${mm}-${yyyy}`;
   }
 
-  // Row click selection - do not trigger on ingredient or action cells
   function handleRowClick(rec, evt) {
-    // Prevent if clicking inside ingredient table or actions cell
     if (
       evt.target.closest(".ingredients-cell") ||
       evt.target.closest(".actions-cell") ||
@@ -329,7 +328,6 @@ export default function RecipesPage() {
     toggleSelect(rec.id);
   }
 
-  // UI
   return (
     <section className="max-w-6xl mx-auto bg-white shadow-lg rounded-xl mt-8 p-6">
       <button
@@ -348,10 +346,11 @@ export default function RecipesPage() {
             setEditRecipe(null);
           }}
         >
-          Add Recipe
+          + Add Recipe
         </button>
       </div>
-      {/* SEARCH BAR */}
+
+      {/* Search Bar */}
       <div className="flex mb-4">
         <input
           type="text"
@@ -361,6 +360,7 @@ export default function RecipesPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
+
       {error && (
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
@@ -379,7 +379,6 @@ export default function RecipesPage() {
         >
           {generating ? "Generating..." : "Generate Grocery List"}
         </button>
-        {/* NEW Global Default Servings Button */}
         <button
           className="px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700"
           onClick={handleSetAllDefaultServings}
@@ -389,7 +388,6 @@ export default function RecipesPage() {
             ? "Setting..."
             : "Set All to Default Servings"}
         </button>
-        {/* NEW Delete Selected Button */}
         <button
           className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
           onClick={handleDeleteSelected}
@@ -398,6 +396,7 @@ export default function RecipesPage() {
           {deleting ? "Deleting..." : "Delete Selected Recipes"}
         </button>
       </div>
+
       {showForm && (
         <div className="mb-10">
           <RecipeForm
@@ -419,6 +418,7 @@ export default function RecipesPage() {
                 <input
                   type="checkbox"
                   checked={
+                    Array.isArray(filteredRecipes) &&
                     filteredRecipes.length > 0 &&
                     filteredRecipes.every((r) => selected.includes(r.id))
                   }
@@ -441,7 +441,8 @@ export default function RecipesPage() {
                   Loading...
                 </td>
               </tr>
-            ) : filteredRecipes.length === 0 ? (
+            ) : !Array.isArray(filteredRecipes) ||
+              filteredRecipes.length === 0 ? (
               <tr>
                 <td
                   colSpan="6"
@@ -451,12 +452,12 @@ export default function RecipesPage() {
                 </td>
               </tr>
             ) : (
-              filteredRecipes.map((rec, idx) => {
+              filteredRecipes.map((rec) => {
                 const hasPendingUpdate = servingsUpdateQueue[rec.id];
                 const displayServings = hasPendingUpdate || rec.servings || 1;
                 return (
                   <tr
-                    key={rec.id}
+                    key={rec.id} // FIXED: Unique key prop
                     className="hover:bg-blue-50 transition cursor-pointer"
                     onClick={(evt) => handleRowClick(rec, evt)}
                   >
@@ -466,7 +467,7 @@ export default function RecipesPage() {
                         checked={selected.includes(rec.id)}
                         onChange={() => toggleSelect(rec.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded"
                       />
                     </td>
                     <td className="py-2 px-4 font-medium">{rec.name}</td>
@@ -500,8 +501,8 @@ export default function RecipesPage() {
                     </td>
                     <td className="py-2 px-4 ingredients-cell">
                       {rec.ingredients && rec.ingredients.length > 0 ? (
-                        <div className="space-y-2">
-                          <table className="min-w-full text-xs border border-gray-200 rounded">
+                        <div className="max-w-xs overflow-hidden">
+                          <table className="w-full text-xs">
                             <thead className="bg-gray-50">
                               <tr>
                                 <th className="px-2 py-1 text-left font-semibold">
@@ -522,7 +523,7 @@ export default function RecipesPage() {
                               {rec.ingredients.map((ri) =>
                                 ri.ingredient ? (
                                   <tr
-                                    key={`${ri.id}-${Math.random()}`}
+                                    key={`${rec.id}-${ri.id || Math.random()}`} // FIXED: Unique key for nested ingredients
                                     className="border-t border-gray-100"
                                   >
                                     <td className="px-2 py-1 font-medium">
@@ -543,7 +544,7 @@ export default function RecipesPage() {
                                         .join(" ")}
                                     </td>
                                     <td className="px-2 py-1 text-gray-600">
-                                      {ri.note ? ri.note : "-"}
+                                      {ri.note || "-"}
                                     </td>
                                   </tr>
                                 ) : null
