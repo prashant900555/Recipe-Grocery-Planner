@@ -4,6 +4,7 @@ import com.grocery.recipes.model.MealPlan;
 import com.grocery.recipes.model.User;
 import com.grocery.recipes.repository.MealPlanRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +50,7 @@ public class MealPlanServiceImpl implements MealPlanService {
     }
 
     @Override
+    @Transactional
     public void deleteByIdAndUser(Long id, User user) {
         mealPlanRepository.deleteByIdAndUser(id, user);
     }

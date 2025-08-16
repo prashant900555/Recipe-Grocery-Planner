@@ -94,10 +94,12 @@ public class RecipeServiceImpl implements RecipeService {
     @Override
     @Transactional
     public void deleteById(Long id) {
-        int usageCount = mealPlanItemRepository.countByRecipeId(id);
-        if (usageCount > 0) {
-            throw new IllegalStateException("Recipe is used in one or more meal plans and cannot be deleted.");
-        }
+//        int usageCount = mealPlanItemRepository.countByRecipeId(id);
+//        if (usageCount > 0) {
+//            throw new IllegalStateException("Recipe is used in one or more meal plans and cannot be deleted.");
+//        }
+        mealPlanItemRepository.deleteByRecipeId(id); // Remove references
+
         recipeRepository.deleteById(id);
     }
 
@@ -110,10 +112,12 @@ public class RecipeServiceImpl implements RecipeService {
             throw new IllegalArgumentException("Recipe not found or doesn't belong to user");
         }
 
-        int usageCount = mealPlanItemRepository.countByRecipeId(id);
-        if (usageCount > 0) {
-            throw new IllegalStateException("Recipe is used in one or more meal plans and cannot be deleted.");
-        }
+//        int usageCount = mealPlanItemRepository.countByRecipeId(id);
+//        if (usageCount > 0) {
+//            throw new IllegalStateException("Recipe is used in one or more meal plans and cannot be deleted.");
+//        }
+        mealPlanItemRepository.deleteByRecipeId(id); // Remove references
+
         recipeRepository.deleteByIdAndUser(id, user);
     }
 
