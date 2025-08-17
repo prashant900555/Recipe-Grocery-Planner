@@ -81,10 +81,21 @@ public class WebSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
+        // Allow both production and localhost for development
         if (frontendUrl != null && !frontendUrl.isBlank()) {
-            configuration.setAllowedOrigins(List.of(frontendUrl));
+            // For production, allow the specific frontend URL
+            configuration.setAllowedOrigins(Arrays.asList(
+                    frontendUrl,
+                    "http://localhost:5173",
+                    "https://recipe-grocery-planner.vercel.app",
+                    "https://recipe-grocery-planner-bpdi8eef7-prashants-projects-3a08d4a6.vercel.app"
+            ));
         } else {
-            configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+            // Fallback for development
+            configuration.setAllowedOrigins(Arrays.asList(
+                    "http://localhost:5173",
+                    "https://recipe-grocery-planner.vercel.app"
+            ));
         }
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
