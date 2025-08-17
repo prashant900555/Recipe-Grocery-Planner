@@ -1,32 +1,31 @@
 import axios from "axios";
-
-const API_URL = "http://localhost:8080/api/ingredients";
+import { apiUrl } from "../config/api.js";
 
 export async function getIngredients() {
-  const res = await axios.get(API_URL);
+  const res = await axios.get(apiUrl("/api/ingredients"));
   return res.data;
 }
 
 export async function getAllIngredients() {
-  const res = await axios.get("http://localhost:8080/api/ingredients");
-  return res.data; // [{id, name, ...}]
+  const res = await axios.get(apiUrl("/api/ingredients"));
+  return res.data; // { id, name, ... }
 }
 
 export async function getIngredient(id) {
-  const res = await axios.get(`${API_URL}/${id}`);
+  const res = await axios.get(apiUrl(`/api/ingredients/${id}`));
   return res.data;
 }
 
 export async function createIngredient(ingredient) {
-  const res = await axios.post(API_URL, ingredient);
+  const res = await axios.post(apiUrl("/api/ingredients"), ingredient);
   return res.data;
 }
 
 export async function updateIngredient(id, ingredient) {
-  const res = await axios.put(`${API_URL}/${id}`, ingredient);
+  const res = await axios.put(apiUrl(`/api/ingredients/${id}`), ingredient);
   return res.data;
 }
 
 export async function deleteIngredient(id) {
-  await axios.delete(`${API_URL}/${id}`);
+  await axios.delete(apiUrl(`/api/ingredients/${id}`));
 }

@@ -1,39 +1,42 @@
 import axios from "axios";
-
-const API_URL = "http://localhost:8080/api/recipes";
+import { apiUrl } from "../config/api.js";
 
 export async function getRecipes() {
-  const res = await axios.get(API_URL);
+  const res = await axios.get(apiUrl("/api/recipes"));
   return res.data;
 }
 
 export async function getRecipe(id) {
-  const res = await axios.get(`${API_URL}/${id}`);
+  const res = await axios.get(apiUrl(`/api/recipes/${id}`));
   return res.data;
 }
 
 export async function createRecipe(recipe) {
-  const res = await axios.post(API_URL, recipe);
+  const res = await axios.post(apiUrl("/api/recipes"), recipe);
   return res.data;
 }
 
 export async function updateRecipe(id, recipe) {
-  const res = await axios.put(`${API_URL}/${id}`, recipe);
+  const res = await axios.put(apiUrl(`/api/recipes/${id}`), recipe);
   return res.data;
 }
 
 export async function deleteRecipe(id) {
-  await axios.delete(`${API_URL}/${id}`);
+  await axios.delete(apiUrl(`/api/recipes/${id}`));
 }
 
 // NEW: Update servings and scale quantities in database
 export async function updateRecipeServings(id, servings) {
-  const res = await axios.patch(`${API_URL}/${id}/servings`, { servings });
+  const res = await axios.patch(apiUrl(`/api/recipes/${id}/servings`), {
+    servings,
+  });
   return res.data;
 }
 
-// NEW: Set all recipes to default servings (2)
+// NEW: Set all recipes to default servings = 2
 export async function setAllRecipesDefaultServings() {
-  const res = await axios.patch(`${API_URL}/default-servings`, { servings: 2 });
+  const res = await axios.patch(apiUrl("/api/recipes/default-servings"), {
+    servings: 2,
+  });
   return res.data;
 }
