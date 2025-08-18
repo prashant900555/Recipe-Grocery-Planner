@@ -1,19 +1,20 @@
 import axios from "axios";
+import { apiUrl } from "../config/api.js";
 
-const API_URL = "http://localhost:8080/api/auth";
+const API_URL = apiUrl("/api/auth");
 
 // Area codes for the dropdown
 export const AREA_CODES = [
-  { code: "+1", country: "US/Canada", flag: "🇺🇸" },
-  { code: "+44", country: "UK", flag: "🇬🇧" },
-  { code: "+91", country: "India", flag: "🇮🇳" },
-  { code: "+353", country: "Ireland", flag: "🇮🇪" },
-  { code: "+61", country: "Australia", flag: "🇦🇺" },
-  { code: "+49", country: "Germany", flag: "🇩🇪" },
-  { code: "+33", country: "France", flag: "🇫🇷" },
-  { code: "+81", country: "Japan", flag: "🇯🇵" },
-  { code: "+86", country: "China", flag: "🇨🇳" },
-  { code: "+7", country: "Russia", flag: "🇷🇺" },
+  { code: "1", country: "US/Canada", flag: "🇺🇸" },
+  { code: "44", country: "UK", flag: "🇬🇧" },
+  { code: "91", country: "India", flag: "🇮🇳" },
+  { code: "353", country: "Ireland", flag: "🇮🇪" },
+  { code: "61", country: "Australia", flag: "🇦🇺" },
+  { code: "49", country: "Germany", flag: "🇩🇪" },
+  { code: "33", country: "France", flag: "🇫🇷" },
+  { code: "81", country: "Japan", flag: "🇯🇵" },
+  { code: "86", country: "China", flag: "🇨🇳" },
+  { code: "7", country: "Russia", flag: "🇷🇺" },
 ];
 
 // Configure axios to include credentials (cookies)
@@ -25,13 +26,11 @@ export async function register(userData) {
 }
 
 export async function login(loginData) {
-  const response = await axios.post(`${API_URL}/login`, {
+  const payload = {
     ...loginData,
-    deviceInfo: `${navigator.platform} - ${navigator.userAgent.substring(
-      0,
-      50
-    )}...`,
-  });
+    deviceInfo: `${navigator.platform}-${navigator.userAgent}`.substring(0, 50),
+  };
+  const response = await axios.post(`${API_URL}/login`, payload);
   return response.data;
 }
 
