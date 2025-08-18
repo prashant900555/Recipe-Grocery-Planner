@@ -18,11 +18,9 @@ public class HomeController {
     private final MealPlanService mealPlanService;
     private final IngredientService ingredientService;
 
-    public HomeController(
-            RecipeService recipeService,
-            MealPlanService mealPlanService,
-            IngredientService ingredientService
-    ) {
+    public HomeController(RecipeService recipeService,
+                          MealPlanService mealPlanService,
+                          IngredientService ingredientService) {
         this.recipeService = recipeService;
         this.mealPlanService = mealPlanService;
         this.ingredientService = ingredientService;

@@ -270,7 +270,7 @@ public class AuthController {
         return "https".equals(forwardedProto) ||
                 "https".equals(forwardedScheme) ||
                 "https".equals(scheme) ||
-                frontendUrl.startsWith("https://");
+                frontendUrl.startsWith("https");
     }
 
     // DTOs

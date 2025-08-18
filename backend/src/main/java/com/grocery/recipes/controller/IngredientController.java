@@ -42,12 +42,12 @@ public class IngredientController {
 
     // PUT /api/ingredients/{id}
     @PutMapping("/{id}")
-    public ResponseEntity<Ingredient> updateIngredient(
-            @PathVariable Long id,
-            @RequestBody Ingredient ingredient) {
+    public ResponseEntity<Ingredient> updateIngredient(@PathVariable Long id,
+                                                       @RequestBody Ingredient ingredient) {
         if (!ingredientService.findById(id).isPresent()) {
             return ResponseEntity.notFound().build();
         }
+
         ingredient.setId(id);
         Ingredient updated = ingredientService.save(ingredient);
         return ResponseEntity.ok(updated);

@@ -28,6 +28,7 @@ public class RecipeController {
 
     // GET /api/recipes - Get all recipes for authenticated user
     @GetMapping
+    @CrossOrigin(origins = "*")
     public ResponseEntity<List<Recipe>> getAllRecipes(Authentication authentication) {
         try {
             User user = getUserFromAuthentication(authentication);
