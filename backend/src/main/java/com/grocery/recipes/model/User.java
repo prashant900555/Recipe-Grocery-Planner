@@ -67,6 +67,7 @@ public class User {
     private List<GroceryItem> groceryItems;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<RefreshToken> refreshTokens;
 
     // Helper method to get full phone number
