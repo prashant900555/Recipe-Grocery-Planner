@@ -6,8 +6,10 @@ import com.grocery.recipes.security.JwtUtils;
 import com.grocery.recipes.service.AuthService;
 import com.grocery.recipes.service.UserService;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -31,6 +33,9 @@ public class AuthController {
     private final AuthService authService;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     public AuthController(AuthenticationManager authenticationManager,
                           UserService userService,
@@ -73,6 +78,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest,
+                                              HttpServletRequest request,
                                               HttpServletResponse response) {
 
         // Find user by email or phone
@@ -81,13 +87,13 @@ public class AuthController {
             // Email login
             userOpt = userService.findByEmail(loginRequest.getLoginIdentifier());
         } else {
-            // Phone login - assuming format is "+91-1234567890"
+            // Phone login - assuming format is "91-1234567890"
             String[] parts = loginRequest.getLoginIdentifier().split("-", 2);
             if (parts.length == 2) {
                 userOpt = userService.findByPhoneAreaCodeAndPhoneNumber(parts[0], parts[1]);
             } else {
                 return ResponseEntity.badRequest()
-                        .body(new MessageResponse("Invalid phone number format. Use: +areacode-number"));
+                        .body(new MessageResponse("Invalid phone number format. Use areacode-number"));
             }
         }
 
@@ -110,27 +116,44 @@ public class AuthController {
         // Create refresh token
         RefreshToken refreshToken = authService.createRefreshToken(user, loginRequest.getDeviceInfo());
 
+        // Determine if we're in production (HTTPS) or development
+        boolean isSecure = isProductionEnvironment(request);
+
         // Set JWT as HttpOnly cookie
         Cookie jwtCookie = new Cookie("accessToken", jwt);
         jwtCookie.setHttpOnly(true);
-        jwtCookie.setSecure(true); // Use only in HTTPS
+        jwtCookie.setSecure(isSecure); // Only secure in production
         jwtCookie.setPath("/");
         jwtCookie.setMaxAge(30 * 60); // 30 minutes
-        response.addCookie(jwtCookie);
+        // Add SameSite attribute for better security
+        if (isSecure) {
+            response.setHeader("Set-Cookie",
+                    String.format("%s=%s; Path=%s; Max-Age=%d; HttpOnly; Secure; SameSite=None",
+                            jwtCookie.getName(), jwtCookie.getValue(), jwtCookie.getPath(), jwtCookie.getMaxAge()));
+        } else {
+            response.addCookie(jwtCookie);
+        }
 
         // Set Refresh Token as HttpOnly cookie
         Cookie refreshCookie = new Cookie("refreshToken", refreshToken.getToken());
         refreshCookie.setHttpOnly(true);
-        refreshCookie.setSecure(true);
+        refreshCookie.setSecure(isSecure); // Only secure in production
         refreshCookie.setPath("/");
         refreshCookie.setMaxAge(14 * 24 * 60 * 60); // 14 days
-        response.addCookie(refreshCookie);
+        if (isSecure) {
+            response.addHeader("Set-Cookie",
+                    String.format("%s=%s; Path=%s; Max-Age=%d; HttpOnly; Secure; SameSite=None",
+                            refreshCookie.getName(), refreshCookie.getValue(), refreshCookie.getPath(), refreshCookie.getMaxAge()));
+        } else {
+            response.addCookie(refreshCookie);
+        }
 
         return ResponseEntity.ok(new JwtResponse(jwt, refreshToken.getToken(), user));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshToken(@CookieValue(value = "refreshToken", required = false) String refreshTokenStr,
+                                          HttpServletRequest request,
                                           HttpServletResponse response) {
         if (refreshTokenStr == null || refreshTokenStr.trim().isEmpty()) {
             return ResponseEntity.badRequest()
@@ -148,20 +171,35 @@ public class AuthController {
                     RefreshToken oldToken = authService.findByToken(refreshTokenStr).get();
                     RefreshToken newRefreshToken = authService.rotateRefreshToken(oldToken, "");
 
+                    // Determine if we're in production
+                    boolean isSecure = isProductionEnvironment(request);
+
                     // Set new cookies
                     Cookie jwtCookie = new Cookie("accessToken", newJwt);
                     jwtCookie.setHttpOnly(true);
-                    jwtCookie.setSecure(true);
+                    jwtCookie.setSecure(isSecure);
                     jwtCookie.setPath("/");
                     jwtCookie.setMaxAge(30 * 60);
-                    response.addCookie(jwtCookie);
+                    if (isSecure) {
+                        response.setHeader("Set-Cookie",
+                                String.format("%s=%s; Path=%s; Max-Age=%d; HttpOnly; Secure; SameSite=None",
+                                        jwtCookie.getName(), jwtCookie.getValue(), jwtCookie.getPath(), jwtCookie.getMaxAge()));
+                    } else {
+                        response.addCookie(jwtCookie);
+                    }
 
                     Cookie refreshCookie = new Cookie("refreshToken", newRefreshToken.getToken());
                     refreshCookie.setHttpOnly(true);
-                    refreshCookie.setSecure(true);
+                    refreshCookie.setSecure(isSecure);
                     refreshCookie.setPath("/");
                     refreshCookie.setMaxAge(14 * 24 * 60 * 60);
-                    response.addCookie(refreshCookie);
+                    if (isSecure) {
+                        response.addHeader("Set-Cookie",
+                                String.format("%s=%s; Path=%s; Max-Age=%d; HttpOnly; Secure; SameSite=None",
+                                        refreshCookie.getName(), refreshCookie.getValue(), refreshCookie.getPath(), refreshCookie.getMaxAge()));
+                    } else {
+                        response.addCookie(refreshCookie);
+                    }
 
                     return ResponseEntity.ok(new TokenRefreshResponse(newJwt, newRefreshToken.getToken()));
                 })
@@ -179,14 +217,14 @@ public class AuthController {
         // Clear cookies
         Cookie jwtCookie = new Cookie("accessToken", "");
         jwtCookie.setHttpOnly(true);
-        jwtCookie.setSecure(true);
+        jwtCookie.setSecure(false); // Allow clearing over HTTP
         jwtCookie.setPath("/");
         jwtCookie.setMaxAge(0);
         response.addCookie(jwtCookie);
 
         Cookie refreshCookie = new Cookie("refreshToken", "");
         refreshCookie.setHttpOnly(true);
-        refreshCookie.setSecure(true);
+        refreshCookie.setSecure(false); // Allow clearing over HTTP
         refreshCookie.setPath("/");
         refreshCookie.setMaxAge(0);
         response.addCookie(refreshCookie);
@@ -219,6 +257,20 @@ public class AuthController {
         userInfo.put("fullPhoneNumber", user.getFullPhoneNumber());
 
         return ResponseEntity.ok(userInfo);
+    }
+
+    // Helper method to detect production environment
+    private boolean isProductionEnvironment(HttpServletRequest request) {
+        // Check various headers that indicate HTTPS/production
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        String forwardedScheme = request.getHeader("X-Forwarded-Scheme");
+        String scheme = request.getScheme();
+
+        // If any forwarded header indicates HTTPS, or if direct scheme is HTTPS
+        return "https".equals(forwardedProto) ||
+                "https".equals(forwardedScheme) ||
+                "https".equals(scheme) ||
+                frontendUrl.startsWith("https://");
     }
 
     // DTOs

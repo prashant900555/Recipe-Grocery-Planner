@@ -83,28 +83,28 @@ public class WebSecurityConfig {
 
         // Allow both production and localhost for development
         if (frontendUrl != null && !frontendUrl.isBlank()) {
-            // For production, allow the specific frontend URL
             configuration.setAllowedOrigins(Arrays.asList(
                     frontendUrl,
                     "http://localhost:5173",
                     "https://recipe-grocery-planner.vercel.app",
-                    "https://recipe-grocery-planner-bpdi8eef7-prashants-projects-3a08d4a6.vercel.app"
+                    "https://recipe-grocery-planner.onrender.com"  // Add your Render URL
             ));
         } else {
-            // Fallback for development
             configuration.setAllowedOrigins(Arrays.asList(
                     "http://localhost:5173",
-                    "https://recipe-grocery-planner.vercel.app"
+                    "https://recipe-grocery-planner.vercel.app",
+                    "https://recipe-grocery-planner.onrender.com"  // Add your Render URL
             ));
         }
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "X-Requested-With"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        configuration.setAllowedHeaders(Arrays.asList("*")); // Allow all headers
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+
 }
