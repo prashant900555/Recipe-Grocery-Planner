@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   getActiveItems,
   getPurchasedItems,
@@ -58,7 +58,7 @@ function autoConvertUnit(quantity, unit) {
   if (u === "oz" && num >= 16) return [formatNumber(num / 16), "lb"];
   if (u === "tsp" && num >= 3) return [formatNumber(num / 3), "tbsp"];
   if (u === "tbsp" && num >= 16) return [formatNumber(num / 16), "cup"];
-  return [isNaN(num) ? "" : formatNumber(num), u];
+  return [isNaN(num) ? "1" : formatNumber(num), u];
 }
 
 function todayAsDDMMYYYY() {
@@ -97,11 +97,13 @@ export default function GroceryListsPage() {
   const [filteredPurchasedItems, setFilteredPurchasedItems] = useState([]);
   const navigate = useNavigate();
 
-  async function fetchAll(unpurchasedIds = []) {
+  // Fixed fetchAll function with useCallback for stability
+  const fetchAll = useCallback(async (unpurchasedIds = []) => {
     setLoading(true);
     try {
       let actives = await getActiveItems();
       let purchased = await getPurchasedItems();
+
       if (unpurchasedIds.length > 0) {
         actives = actives.map((item) =>
           unpurchasedIds.includes(item.id)
@@ -109,14 +111,17 @@ export default function GroceryListsPage() {
             : item
         );
       }
+
       actives = actives.map((item) => {
         const [qty, u] = autoConvertUnit(item.quantity, item.unit);
         return { ...item, quantity: qty, unit: u };
       });
+
       purchased = purchased.map((item) => {
         const [qty, u] = autoConvertUnit(item.quantity, item.unit);
         return { ...item, quantity: qty, unit: u };
       });
+
       setActiveItems(actives);
       setPurchasedItems(purchased);
       setError("");
@@ -125,14 +130,15 @@ export default function GroceryListsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
+  // Fixed useEffect with proper dependencies
   useEffect(() => {
     fetchAll();
     getAllIngredients()
       .then((list) => setIngredients(list))
       .catch(() => setIngredients([]));
-  }, []);
+  }, [fetchAll]);
 
   useEffect(() => {
     const filterItems = (items) => {
@@ -141,6 +147,7 @@ export default function GroceryListsPage() {
         item.itemName.toLowerCase().includes(searchTerm.toLowerCase())
       );
     };
+
     setFilteredActiveItems(filterItems(activeItems));
     setFilteredPurchasedItems(filterItems(purchasedItems));
   }, [searchTerm, activeItems, purchasedItems]);
@@ -175,6 +182,7 @@ export default function GroceryListsPage() {
       setError("Item name is required.");
       return;
     }
+
     try {
       const [qty, unit] = autoConvertUnit(newItem.quantity, newItem.unit);
       await addItem({
@@ -195,6 +203,7 @@ export default function GroceryListsPage() {
       setError("Item name is required.");
       return;
     }
+
     try {
       const [qty, unit] = autoConvertUnit(editItem.quantity, editItem.unit);
       await updateItem(editingId, {
@@ -225,6 +234,7 @@ export default function GroceryListsPage() {
       setError(`Select ${type} items to delete.`);
       return;
     }
+
     if (!window.confirm(`Delete selected ${type} items?`)) return;
     try {
       for (const id of ids) {
@@ -258,6 +268,7 @@ export default function GroceryListsPage() {
       setError("Select items to mark as purchased.");
       return;
     }
+
     try {
       await markPurchased(selectedIds);
       setSelectedIds([]);
@@ -272,6 +283,7 @@ export default function GroceryListsPage() {
       setError("Select items to undo purchased.");
       return;
     }
+
     try {
       await undoPurchased(selectedPurchasedIds);
       setJustUnpurchasedIds(selectedPurchasedIds);
@@ -654,10 +666,10 @@ export default function GroceryListsPage() {
                                 selectedPurchasedIds.includes(item.id)
                               )
                         }
-                        onChange={() =>
+                        onChange={
                           !showPurchased
-                            ? toggleSelectAllActive()
-                            : toggleSelectAllPurchased()
+                            ? toggleSelectAllActive
+                            : toggleSelectAllPurchased
                         }
                         className="w-5 h-5 text-blue-600 border-gray-300 rounded"
                       />
@@ -683,7 +695,7 @@ export default function GroceryListsPage() {
                   {loading ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan="6"
                         className="py-12 text-center text-gray-400"
                       >
                         Loading...
@@ -693,7 +705,7 @@ export default function GroceryListsPage() {
                     filteredActiveItems.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan="6"
                           className="py-12 text-center text-gray-400"
                         >
                           No active items found.
@@ -705,6 +717,7 @@ export default function GroceryListsPage() {
                         if (editingId === item.id) {
                           return renderEditableRow(item);
                         }
+
                         return (
                           <tr
                             key={item.id}
@@ -764,7 +777,7 @@ export default function GroceryListsPage() {
                   ) : filteredPurchasedItems.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan="6"
                         className="py-12 text-center text-gray-400"
                       >
                         No purchased items found.
@@ -776,6 +789,7 @@ export default function GroceryListsPage() {
                       if (editingId === item.id) {
                         return renderEditableRow(item);
                       }
+
                       return (
                         <tr
                           key={item.id}
@@ -885,15 +899,15 @@ export default function GroceryListsPage() {
                 <h4 className="font-medium text-gray-900 mb-3">Quick Stats</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Active:</span>
+                    <span className="text-gray-600">Total Active</span>
                     <span className="font-medium">{activeItems.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Purchased:</span>
+                    <span className="text-gray-600">Total Purchased</span>
                     <span className="font-medium">{purchasedItems.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Selected:</span>
+                    <span className="text-gray-600">Selected</span>
                     <span className="font-medium">
                       {!showPurchased
                         ? selectedIds.length
