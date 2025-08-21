@@ -106,9 +106,9 @@ public class RecipeController {
 
     // PATCH /api/recipes/{id}/servings - Updates servings and scales ingredient quantities
     @PatchMapping("/{id}/servings")
-    public ResponseEntity<Void> updateServingsAndQuantities(@PathVariable Long id,
-                                                            @RequestBody Map<String, Integer> payload,
-                                                            Authentication authentication) {
+    public ResponseEntity<?> updateServingsAndQuantities(@PathVariable Long id,
+                                                         @RequestBody Map<String, Integer> payload,
+                                                         Authentication authentication) {
         try {
             User user = getUserFromAuthentication(authentication);
             if (!payload.containsKey("servings")) {
@@ -116,6 +116,13 @@ public class RecipeController {
             }
 
             recipeService.updateServingsAndScaleQuantities(id, payload.get("servings"), user);
+
+            // Return the updated recipe
+            Optional<Recipe> updatedRecipe = recipeService.findByIdAndUser(id, user);
+            if (updatedRecipe.isPresent()) {
+                return ResponseEntity.ok(updatedRecipe.get());
+            }
+
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
