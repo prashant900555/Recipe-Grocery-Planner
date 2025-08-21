@@ -27,10 +27,10 @@ function debounce(func, wait) {
 // Unit conversion utility functions
 const convertUnits = (quantity, unit) => {
   const num = parseFloat(quantity);
-  if (isNaN(num) || num <= 0) return `${quantity} ${unit}`;
+  if (isNaN(num) || num === 0) return `${quantity} ${unit}`;
 
   const formatNumber = (value) => {
-    if (value < 1 && value > 0) return value;
+    if (value <= 1 && value > 0) return value;
     return Number(value.toFixed(2)).toString();
   };
 
@@ -82,15 +82,7 @@ export default function RecipesPage() {
     debounce(async (recipeId, servings) => {
       try {
         await updateRecipeServings(recipeId, servings);
-        const updatedRecipes = await getRecipes();
-        const updatedRecipe = updatedRecipes.find((r) => r.id === recipeId);
-        if (updatedRecipe) {
-          setRecipes((prev) =>
-            prev.map((recipe) =>
-              recipe.id === recipeId ? updatedRecipe : recipe
-            )
-          );
-        }
+        // Remove from queue after successful backend update
         setServingsUpdateQueue((prev) => {
           const newQueue = { ...prev };
           delete newQueue[recipeId];
@@ -99,6 +91,7 @@ export default function RecipesPage() {
       } catch (error) {
         console.error("Error updating servings:", error);
         setError(`Failed to save servings update for recipe ${recipeId}`);
+        // Remove from queue on error
         setServingsUpdateQueue((prev) => {
           const newQueue = { ...prev };
           delete newQueue[recipeId];
@@ -220,30 +213,75 @@ export default function RecipesPage() {
     }
   }
 
+  // FIXED: Immediate UI update for servings changes
   function handleServingsChange(recipeId, newServings) {
     const parsedServings = parseInt(newServings) || 1;
+
+    // Immediately update the UI state
+    setRecipes((prev) =>
+      prev.map((recipe) => {
+        if (recipe.id === recipeId) {
+          // Calculate scaling factor
+          const factor = parsedServings / recipe.servings;
+
+          // Scale ingredient quantities immediately
+          const scaledIngredients =
+            recipe.ingredients?.map((ingredient) => ({
+              ...ingredient,
+              quantity: ingredient.quantity * factor,
+            })) || [];
+
+          return {
+            ...recipe,
+            servings: parsedServings,
+            ingredients: scaledIngredients,
+          };
+        }
+        return recipe;
+      })
+    );
+
+    // Mark as pending update for visual feedback
     setServingsUpdateQueue((prev) => ({
       ...prev,
       [recipeId]: parsedServings,
     }));
+
+    // Debounced backend update
     debouncedUpdateServings(recipeId, parsedServings);
   }
 
+  // FIXED: Immediate UI update for default servings
   async function handleSetDefaultServings(recipeId) {
     try {
+      // Immediately update the UI
+      setRecipes((prev) =>
+        prev.map((recipe) => {
+          if (recipe.id === recipeId) {
+            const factor = 2 / recipe.servings;
+            const scaledIngredients =
+              recipe.ingredients?.map((ingredient) => ({
+                ...ingredient,
+                quantity: ingredient.quantity * factor,
+              })) || [];
+
+            return {
+              ...recipe,
+              servings: 2,
+              ingredients: scaledIngredients,
+            };
+          }
+          return recipe;
+        })
+      );
+
+      // Then update backend
       await updateRecipeServings(recipeId, 2);
-      const updatedRecipes = await getRecipes();
-      const updatedRecipe = updatedRecipes.find((r) => r.id === recipeId);
-      if (updatedRecipe) {
-        setRecipes((prev) =>
-          prev.map((recipe) =>
-            recipe.id === recipeId ? updatedRecipe : recipe
-          )
-        );
-      }
     } catch (err) {
       console.error("Error setting default servings:", err);
       setError(`Failed to set default servings for recipe ${recipeId}`);
+      // Revert on error
+      fetchAllRecipes();
     }
   }
 
@@ -259,8 +297,26 @@ export default function RecipesPage() {
     setSettingDefaultServings(true);
     setError("");
     try {
+      // Immediately update all recipes in UI
+      setRecipes((prev) =>
+        prev.map((recipe) => {
+          const factor = 2 / recipe.servings;
+          const scaledIngredients =
+            recipe.ingredients?.map((ingredient) => ({
+              ...ingredient,
+              quantity: ingredient.quantity * factor,
+            })) || [];
+
+          return {
+            ...recipe,
+            servings: 2,
+            ingredients: scaledIngredients,
+          };
+        })
+      );
+
+      // Then update backend
       await setAllRecipesDefaultServings();
-      await fetchAllRecipes();
     } catch (e) {
       console.error("Error setting default servings for all recipes:", e);
       let message = "Failed to set default servings for all recipes.";
@@ -272,6 +328,8 @@ export default function RecipesPage() {
         message = e.message;
       }
       setError(message);
+      // Revert on error
+      fetchAllRecipes();
     } finally {
       setSettingDefaultServings(false);
     }
@@ -335,7 +393,7 @@ export default function RecipesPage() {
         className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         onClick={() => navigate("/")}
       >
-        ← Back to Home
+        Back to Home
       </button>
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
         <h2 className="text-3xl font-bold text-blue-800">Recipes</h2>
@@ -346,7 +404,7 @@ export default function RecipesPage() {
             setEditRecipe(null);
           }}
         >
-          + Add Recipe
+          Add Recipe
         </button>
       </div>
 
@@ -370,7 +428,7 @@ export default function RecipesPage() {
       {/* Selection and Generate */}
       <div className="mb-6 border p-4 rounded bg-blue-50 flex flex-wrap items-center gap-3">
         <span className="font-semibold mr-2">
-          Select recipes to generate a grocery list:
+          Select recipes to generate a grocery list
         </span>
         <button
           className="px-3 py-1 bg-green-700 text-white rounded"
@@ -457,7 +515,7 @@ export default function RecipesPage() {
                 const displayServings = hasPendingUpdate || rec.servings || 1;
                 return (
                   <tr
-                    key={rec.id} // FIXED: Unique key prop
+                    key={rec.id}
                     className="hover:bg-blue-50 transition cursor-pointer"
                     onClick={(evt) => handleRowClick(rec, evt)}
                   >
@@ -505,25 +563,25 @@ export default function RecipesPage() {
                           <table className="w-full text-xs">
                             <thead className="bg-gray-50">
                               <tr>
-                                <th className="px-2 py-1 text-left font-semibold">
+                                <th className="px-1 py-1 text-left font-semibold">
                                   Ingredient
                                 </th>
-                                <th className="px-2 py-1 text-left font-semibold">
+                                <th className="px-1 py-1 text-left font-semibold">
                                   Qty
                                 </th>
-                                <th className="px-2 py-1 text-left font-semibold">
+                                <th className="px-1 py-1 text-left font-semibold">
                                   Unit
                                 </th>
-                                <th className="px-2 py-1 text-left font-semibold">
+                                <th className="px-1 py-1 text-left font-semibold">
                                   Note
                                 </th>
                               </tr>
                             </thead>
                             <tbody>
-                              {rec.ingredients.map((ri) =>
+                              {rec.ingredients.map((ri, riIdx) =>
                                 ri.ingredient ? (
                                   <tr
-                                    key={`${rec.id}-${ri.id || Math.random()}`} // FIXED: Unique key for nested ingredients
+                                    key={`${rec.id}-${ri.id}-${riIdx}`}
                                     className="border-t border-gray-100"
                                   >
                                     <td className="px-2 py-1 font-medium">
